@@ -30,7 +30,15 @@ See [docs/SPEC.md](docs/SPEC.md) for the full design rationale.
 
 ## Install
 
-**Prebuilt binary** — download for your OS/arch from the [Releases](https://github.com/amanjaiman/agentkeeper/releases) page and put it on your `PATH`.
+**Prebuilt binary** — download for your OS/arch from the [Releases](https://github.com/amanjaiman/agentkeeper/releases) page.
+
+Put it on your `PATH`:
+
+```bash
+./agentkeeper install
+```
+
+If the install directory is not already on `PATH`, the command prints the exact `setx PATH` or `export PATH` line to run, plus a reminder to open a new shell.
 
 **With the Go toolchain:**
 
@@ -82,6 +90,7 @@ Everything after `--` is the command to launch (it overrides the adapter default
 | `stop --name N [--kill]` | Stop watching; `--kill` also terminates the session. |
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
 | `parse --agent A "text…"` | Test a captured limit string against an agent's patterns and show the resolved reset. |
+| `install [--dir DIR] [--force]` | Copy this binary to a PATH directory. |
 | `version` | Print the build version. |
 
 ### `run` flags

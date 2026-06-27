@@ -51,6 +51,8 @@ func main() {
 		err = agentsCmd(os.Args[2:])
 	case "parse":
 		err = parseCmd(os.Args[2:])
+	case "install":
+		err = installCmd(os.Args[2:])
 	case "status":
 		err = statusCmd(os.Args[2:])
 	case "detach":
@@ -79,6 +81,7 @@ Usage:
   agentkeeper attach-existing --target T [flags]              watch an already-running tmux session
   agentkeeper agents          [--config PATH]                 list configured adapters
   agentkeeper parse           --agent A "limit text..."       test a limit string against patterns
+  agentkeeper install         [--dir DIR] [--force]           copy this binary to a PATH directory
   agentkeeper status          [--name NAME]                   report state / countdown
   agentkeeper detach          --name NAME                     stop watching, keep session
   agentkeeper stop            --name NAME [--kill]             stop watching (optionally kill)
