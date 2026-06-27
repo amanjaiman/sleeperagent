@@ -25,6 +25,13 @@ transcript_glob = "~/.claude/projects/*/*.jsonl"
 # unattended tool calls with no permission prompts).
 yolo_flag       = "--dangerously-skip-permissions"
 
+# Optional, after you verify your local Claude menu uses "1" for the safe
+# "Stop and wait for the limit to reset" choice:
+# [[agents.claude.auto_responses]]
+# pattern = "(?i)rate.?limit.?options|stop and wait for (?:the|your) limit to reset"
+# keys    = "1\r"
+# once    = true
+
 [agents.codex]
 launch_cmd     = "codex"
 resume_cmd     = "codex resume"

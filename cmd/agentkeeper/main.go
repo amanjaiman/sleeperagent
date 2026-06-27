@@ -330,7 +330,13 @@ func watchSession(p watchParams) error {
 		WatchOnly:    p.watchOnly,
 		Commands:     cmds,
 		OnUpdate:     writeRecord,
-		Logf:         log.Printf,
+		OnManualAction: func(msg string) {
+			p.notifier.Notify(notify.Event{
+				Title: "AgentKeeper [" + p.instance + "]: manual choice needed",
+				Body:  msg,
+			})
+		},
+		Logf: log.Printf,
 	})
 
 	if err := sup.Run(ctx); err != nil {

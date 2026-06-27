@@ -6,6 +6,7 @@ package supervisor
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -77,6 +78,8 @@ const scrollback = 100
 // loop forever.
 const maxCaptureFails = 5
 
+var safeStopAndWait = regexp.MustCompile(`(?i)stop and wait for (?:the|your) limit to reset`)
+
 // Options configures a Supervisor.
 type Options struct {
 	Adapter      *adapter.Adapter
@@ -97,6 +100,9 @@ type Options struct {
 	// OnUpdate, if set, is called whenever the observable state changes so the
 	// caller can persist a Snapshot. May be nil.
 	OnUpdate func(Snapshot)
+	// OnManualAction, if set, is called when a matched auto-response cannot be
+	// answered safely and needs the human to choose in the agent UI.
+	OnManualAction func(string)
 	// Now and Logf are injectable for testing; nil values get sensible defaults.
 	Now  func() time.Time
 	Logf func(format string, args ...any)
@@ -121,6 +127,7 @@ type Supervisor struct {
 	injected       bool
 	injectAttempts int
 	preInject      string
+	handledAuto    map[int]string
 
 	killed       bool
 	ended        bool
@@ -235,6 +242,11 @@ func (s *Supervisor) tick() error {
 	if s.handledMatch != "" && !strings.Contains(capture, s.handledMatch) {
 		s.handledMatch = ""
 	}
+	for i, match := range s.handledAuto {
+		if match != "" && !strings.Contains(capture, match) {
+			delete(s.handledAuto, i)
+		}
+	}
 
 	// If a human has taken over the session, step aside rather than fighting them
 	// for the input. Only meaningful while observing or waiting.
@@ -251,7 +263,7 @@ func (s *Supervisor) tick() error {
 	case state.Running:
 		s.onRunning(capture, now)
 	case state.Limited:
-		s.onLimited(now)
+		s.onLimited(capture, now)
 	case state.Waiting:
 		s.onWaiting(now)
 	case state.Resuming:
@@ -323,6 +335,7 @@ func (s *Supervisor) onRunning(capture string, now time.Time) {
 	}
 	match, groups, ok := parser.Detect(s.opt.Adapter.LimitPatterns, capture)
 	if !ok {
+		s.scanAutoResponses(capture)
 		return
 	}
 	// Ignore the same limit line we already handled and that is still sitting in
@@ -335,9 +348,11 @@ func (s *Supervisor) onRunning(capture string, now time.Time) {
 	s.groups = groups
 	s.st = state.Limited
 	s.opt.Logf("usage limit detected")
+	s.scanAutoResponses(capture)
 }
 
-func (s *Supervisor) onLimited(now time.Time) {
+func (s *Supervisor) onLimited(capture string, now time.Time) {
+	s.scanAutoResponses(capture)
 	s.reset = parser.Resolve(s.groups, now, fallbackWindow)
 	s.waitUntil = s.reset.Time.Add(s.opt.ResetBuffer)
 
@@ -360,6 +375,41 @@ func (s *Supervisor) onLimited(now time.Time) {
 	}
 	s.lastCountdown = time.Time{}
 	s.st = state.Waiting
+}
+
+func (s *Supervisor) scanAutoResponses(capture string) {
+	if len(s.opt.Adapter.AutoResponses) == 0 {
+		return
+	}
+	if s.handledAuto == nil {
+		s.handledAuto = make(map[int]string)
+	}
+	for i, ar := range s.opt.Adapter.AutoResponses {
+		match := ar.Pattern.FindString(capture)
+		if match == "" {
+			continue
+		}
+		if ar.Once && s.handledAuto[i] == match {
+			continue
+		}
+		if ar.Keys == "" || !safeStopAndWait.MatchString(capture) {
+			msg := "manual choice needed at the agent: rate-limit menu matched but no verified stop-and-wait keystrokes are configured"
+			s.opt.Logf("%s", msg)
+			if s.opt.OnManualAction != nil {
+				s.opt.OnManualAction(msg)
+			}
+			s.handledAuto[i] = match
+			continue
+		}
+		if err := s.opt.Tmux.Inject(ar.Keys, adapter.InjectKeys); err != nil {
+			s.opt.Logf("auto-response injection failed: %v", err)
+			continue
+		}
+		s.opt.Logf("auto-response injected for safe stop-and-wait menu")
+		if ar.Once {
+			s.handledAuto[i] = match
+		}
+	}
 }
 
 func (s *Supervisor) onWaiting(now time.Time) {

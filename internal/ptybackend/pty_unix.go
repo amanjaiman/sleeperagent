@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/amanjaiman/agentkeeper/internal/adapter"
 	"github.com/creack/pty"
 	"golang.org/x/term"
 )
@@ -88,6 +89,10 @@ func (c *Client) Capture(scrollback int) (string, error) {
 
 // Inject writes the resume keystrokes to the pty (Enter is a carriage return).
 func (c *Client) Inject(text, style string) error {
+	if style == adapter.InjectKeys {
+		_, err := c.ptmx.Write([]byte(text))
+		return err
+	}
 	if style == "esc-text-enter" {
 		if _, err := c.ptmx.Write([]byte{0x1b}); err != nil {
 			return err

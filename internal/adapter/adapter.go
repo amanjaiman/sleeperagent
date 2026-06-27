@@ -15,6 +15,9 @@ const (
 	InjectEscTextEnter = "esc-text-enter"
 	// InjectTextEnter sends the literal text, then Enter.
 	InjectTextEnter = "text-enter"
+	// InjectKeys sends the configured keystrokes exactly as provided. It is used
+	// for prompt/menu auto-responses where the config owns the Enter key.
+	InjectKeys = "keys"
 )
 
 // Adapter describes how to drive a particular coding agent: how to launch it,
@@ -33,6 +36,9 @@ type Adapter struct {
 	// full-auto. Appended to the launch command only with the explicit --yolo
 	// opt-in. Empty means the agent has no such flag configured.
 	YoloFlag string
+	// AutoResponses are safe, explicitly configured prompt/menu responses the
+	// supervisor may send while watching.
+	AutoResponses []AutoResponse
 }
 
 // Spec is the raw, un-compiled form of an adapter as it appears in config.
@@ -44,6 +50,22 @@ type Spec struct {
 	InjectStyle    string
 	TranscriptGlob string
 	YoloFlag       string
+	AutoResponses  []AutoResponseSpec
+}
+
+// AutoResponse is a compiled rule that injects keystrokes when a safe prompt or
+// menu appears in the agent output.
+type AutoResponse struct {
+	Pattern *regexp.Regexp
+	Keys    string
+	Once    bool
+}
+
+// AutoResponseSpec is the raw config form of AutoResponse.
+type AutoResponseSpec struct {
+	Pattern string
+	Keys    string
+	Once    bool
 }
 
 // Compile turns a raw Spec into a ready-to-use Adapter, compiling every regex.
@@ -77,6 +99,16 @@ func Compile(name string, s Spec) (*Adapter, error) {
 			return nil, fmt.Errorf("adapter %q: idle_pattern %q: %w", name, s.IdlePattern, err)
 		}
 		a.IdlePattern = re
+	}
+	for i, ar := range s.AutoResponses {
+		if ar.Pattern == "" {
+			return nil, fmt.Errorf("adapter %q: auto_responses[%d]: pattern is required", name, i)
+		}
+		re, err := regexp.Compile(ar.Pattern)
+		if err != nil {
+			return nil, fmt.Errorf("adapter %q: auto_responses[%d].pattern %q: %w", name, i, ar.Pattern, err)
+		}
+		a.AutoResponses = append(a.AutoResponses, AutoResponse{Pattern: re, Keys: ar.Keys, Once: ar.Once})
 	}
 	return a, nil
 }

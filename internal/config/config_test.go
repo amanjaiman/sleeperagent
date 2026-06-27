@@ -80,6 +80,40 @@ inject_style = "text-enter"
 	}
 }
 
+func TestLoadAutoResponses(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	body := `
+[agents.claude]
+launch_cmd = "claude"
+limit_patterns = ["(?i)limit reached (?P<time>.+)"]
+
+[[agents.claude.auto_responses]]
+pattern = "(?i)stop and wait for the limit to reset"
+keys = "1\r"
+once = true
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ad, err := cfg.Adapter("claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ad.AutoResponses) != 1 {
+		t.Fatalf("auto responses = %d, want 1", len(ad.AutoResponses))
+	}
+	if ad.AutoResponses[0].Keys != "1\r" || !ad.AutoResponses[0].Once {
+		t.Fatalf("auto response = %+v", ad.AutoResponses[0])
+	}
+	if !ad.AutoResponses[0].Pattern.MatchString("Stop and wait for the limit to reset") {
+		t.Fatal("compiled auto-response pattern did not match")
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

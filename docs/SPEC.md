@@ -236,6 +236,7 @@ denylist         = ["rm -rf", "force push", "--force", "drop table"]
 ## 7. Security & safety
 
 - **Unattended execution is the real risk.** Resuming overnight means tool calls run with no human in the loop. Do **not** silently enable `--dangerously-skip-permissions` / Codex full-auto — make it an explicit, loud opt-in flag (`--yolo`) with a printed warning, and default to the agent's normal permission prompts.
+- **Auto-responses must be conservative.** Menu/prompt auto-responses are config-driven and may only answer verified safe choices such as Claude's "stop and wait for the limit to reset" option. They must not select paid overage, plan upgrade, model-switch, or permission-bypass choices; ambiguous menus require human action.
 - **LLM-generated prompts** pass the denylist + length cap before injection; on any doubt, fall back to static.
 - **Scope guidance.** Encourage specific resume prompts ("continue implementing X in file Y") over open-ended "do everything."
 - **No quota circumvention.** The tool only waits for legitimate resets; document this clearly to avoid ToS gray areas.

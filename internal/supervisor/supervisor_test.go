@@ -2,6 +2,8 @@ package supervisor
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 type fakePane struct {
 	screen     string
 	injected   []string
+	styles     []string
 	onInject   func(text string) string // returns the new screen after injection
 	attached   bool                     // reported by ClientAttached
 	killed     bool
@@ -35,6 +38,7 @@ func (f *fakePane) Ended() (bool, error)          { return f.ended, nil }
 func (f *fakePane) Kill() error                   { f.killed = true; return nil }
 func (f *fakePane) Inject(text, style string) error {
 	f.injected = append(f.injected, text)
+	f.styles = append(f.styles, style)
 	if f.onInject != nil {
 		f.screen = f.onInject(text)
 	}
@@ -242,6 +246,70 @@ func TestWatchOnlyDetachesAtResetWithoutInjecting(t *testing.T) {
 	}
 }
 
+func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
+	menu := readParserTestdata(t, "claude_rate_limit_options.txt")
+	pane := &fakePane{screen: "Claude usage limit reached. Your limit will reset at 11am.\n" + menu}
+	ad, err := adapter.Compile("claude", adapter.Spec{
+		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^\r\n.]+)`},
+		AutoResponses: []adapter.AutoResponseSpec{{
+			Pattern: `(?i)rate.?limit.?options|stop and wait for (?:the|your) limit to reset`,
+			Keys:    "1\r",
+			Once:    true,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+	})
+
+	must(t, sup.tick())
+	must(t, sup.tick())
+	must(t, sup.tick())
+
+	if len(pane.injected) != 1 || pane.injected[0] != "1\r" {
+		t.Fatalf("auto-response injected = %q, want one %q", pane.injected, "1\\r")
+	}
+	if pane.styles[0] != adapter.InjectKeys {
+		t.Fatalf("style = %q, want %q", pane.styles[0], adapter.InjectKeys)
+	}
+}
+
+func TestAutoResponseAmbiguousMenuNotifiesWithoutInjecting(t *testing.T) {
+	pane := &fakePane{screen: "/rate-limit-options\n1. Upgrade plan\n2. Switch model\n"}
+	ad, err := adapter.Compile("claude", adapter.Spec{
+		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^\r\n.]+)`},
+		AutoResponses: []adapter.AutoResponseSpec{{
+			Pattern: `(?i)rate.?limit.?options`,
+			Keys:    "1\r",
+			Once:    true,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manual []string
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		OnManualAction: func(msg string) {
+			manual = append(manual, msg)
+		},
+	})
+
+	must(t, sup.tick())
+	must(t, sup.tick())
+
+	if len(pane.injected) != 0 {
+		t.Fatalf("ambiguous menu must not inject, got %q", pane.injected)
+	}
+	if len(manual) != 1 {
+		t.Fatalf("manual notifications = %d, want 1", len(manual))
+	}
+}
+
 func TestWeeklyCapDetaches(t *testing.T) {
 	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
 	// Headless-style unix ts 3 days out.
@@ -420,6 +488,15 @@ func must(t *testing.T, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func readParserTestdata(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "parser", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }

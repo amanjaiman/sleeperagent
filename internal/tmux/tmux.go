@@ -77,6 +77,9 @@ func (c *Client) Capture(scrollback int) (string, error) {
 // an Esc to focus the input box, the literal text, then Enter to submit. The
 // text is sent with -l (literal) so it is never interpreted as a key name.
 func (c *Client) Inject(text, style string) error {
+	if style == adapter.InjectKeys {
+		return c.injectKeys(text)
+	}
 	if style == adapter.InjectEscTextEnter {
 		if _, err := c.run("send-keys", "-t", c.Session, "Escape"); err != nil {
 			return err
@@ -87,6 +90,39 @@ func (c *Client) Inject(text, style string) error {
 	}
 	_, err := c.run("send-keys", "-t", c.Session, "Enter")
 	return err
+}
+
+func (c *Client) injectKeys(keys string) error {
+	var literal strings.Builder
+	flush := func() error {
+		if literal.Len() == 0 {
+			return nil
+		}
+		_, err := c.run("send-keys", "-t", c.Session, "-l", literal.String())
+		literal.Reset()
+		return err
+	}
+	for _, r := range keys {
+		switch r {
+		case '\r', '\n':
+			if err := flush(); err != nil {
+				return err
+			}
+			if _, err := c.run("send-keys", "-t", c.Session, "Enter"); err != nil {
+				return err
+			}
+		case '\x1b':
+			if err := flush(); err != nil {
+				return err
+			}
+			if _, err := c.run("send-keys", "-t", c.Session, "Escape"); err != nil {
+				return err
+			}
+		default:
+			literal.WriteRune(r)
+		}
+	}
+	return flush()
 }
 
 // Kill terminates the session (and the agent inside it).

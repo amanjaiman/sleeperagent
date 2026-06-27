@@ -31,13 +31,21 @@ func (d Duration) D() time.Duration { return time.Duration(d) }
 
 // AgentConfig is the raw adapter config for one agent.
 type AgentConfig struct {
-	LaunchCmd      string   `toml:"launch_cmd"`
-	ResumeCmd      string   `toml:"resume_cmd"`
-	LimitPatterns  []string `toml:"limit_patterns"`
-	IdlePattern    string   `toml:"idle_pattern"`
-	InjectStyle    string   `toml:"inject_style"`
-	TranscriptGlob string   `toml:"transcript_glob"`
-	YoloFlag       string   `toml:"yolo_flag"`
+	LaunchCmd      string               `toml:"launch_cmd"`
+	ResumeCmd      string               `toml:"resume_cmd"`
+	LimitPatterns  []string             `toml:"limit_patterns"`
+	IdlePattern    string               `toml:"idle_pattern"`
+	InjectStyle    string               `toml:"inject_style"`
+	TranscriptGlob string               `toml:"transcript_glob"`
+	YoloFlag       string               `toml:"yolo_flag"`
+	AutoResponses  []AutoResponseConfig `toml:"auto_responses"`
+}
+
+// AutoResponseConfig configures one safe prompt/menu response.
+type AutoResponseConfig struct {
+	Pattern string `toml:"pattern"`
+	Keys    string `toml:"keys"`
+	Once    bool   `toml:"once"`
 }
 
 // RepromptConfig configures the optional local-LLM prompt builder (M4).
@@ -183,5 +191,14 @@ func (c Config) Adapter(name string) (*adapter.Adapter, error) {
 		InjectStyle:    ac.InjectStyle,
 		TranscriptGlob: ac.TranscriptGlob,
 		YoloFlag:       ac.YoloFlag,
+		AutoResponses:  autoResponseSpecs(ac.AutoResponses),
 	})
+}
+
+func autoResponseSpecs(in []AutoResponseConfig) []adapter.AutoResponseSpec {
+	out := make([]adapter.AutoResponseSpec, 0, len(in))
+	for _, ar := range in {
+		out = append(out, adapter.AutoResponseSpec{Pattern: ar.Pattern, Keys: ar.Keys, Once: ar.Once})
+	}
+	return out
 }

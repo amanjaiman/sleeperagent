@@ -16,6 +16,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/amanjaiman/agentkeeper/internal/adapter"
 	"golang.org/x/sys/windows"
 	"golang.org/x/term"
 )
@@ -210,6 +211,10 @@ func (c *Client) Capture(scrollback int) (string, error) {
 func (c *Client) Inject(text, style string) error {
 	if c.inWrite == nil {
 		return fmt.Errorf("conpty not started")
+	}
+	if style == adapter.InjectKeys {
+		_, err := c.inWrite.Write([]byte(text))
+		return err
 	}
 	if style == "esc-text-enter" {
 		if _, err := c.inWrite.Write([]byte{0x1b}); err != nil {
