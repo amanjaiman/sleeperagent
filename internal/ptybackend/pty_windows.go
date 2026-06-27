@@ -271,8 +271,20 @@ func (c *Client) Foreground(ctx context.Context) error {
 	return nil
 }
 
+// Wait blocks until the agent exits or ctx is cancelled.
+func (c *Client) Wait(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-c.done:
+	}
+}
+
 // Close tears down the pseudoconsole and releases all handles.
 func (c *Client) Close() {
+	if c.echo {
+		restoreTerminal()
+		c.echo = false
+	}
 	if c.hpcon != 0 {
 		procClosePseudoConsole.Call(uintptr(c.hpcon))
 		c.hpcon = 0

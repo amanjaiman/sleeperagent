@@ -127,8 +127,6 @@ type Supervisor struct {
 	captureFails int
 	lastSnap     Snapshot
 	hasSnap      bool
-
-	lastCountdown time.Time
 }
 
 // New builds a Supervisor and fills in default Now/Logf.
@@ -358,7 +356,6 @@ func (s *Supervisor) onLimited(now time.Time) {
 		s.st = state.Detached
 		return
 	}
-	s.lastCountdown = time.Time{}
 	s.st = state.Waiting
 }
 
@@ -374,11 +371,6 @@ func (s *Supervisor) onWaiting(now time.Time) {
 		s.injectAttempts = 0
 		s.st = state.Resuming
 		return
-	}
-	// Throttle countdown output to once every 30s.
-	if now.Sub(s.lastCountdown) >= 30*time.Second {
-		s.lastCountdown = now
-		s.opt.Logf("waiting %s until reset", s.waitUntil.Sub(now).Round(time.Second))
 	}
 }
 

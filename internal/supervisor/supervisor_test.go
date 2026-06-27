@@ -3,6 +3,7 @@ package supervisor
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -239,6 +240,45 @@ func TestWatchOnlyDetachesAtResetWithoutInjecting(t *testing.T) {
 	}
 	if len(pane.injected) != 0 {
 		t.Fatalf("watch-only must not inject, got %v", pane.injected)
+	}
+}
+
+func TestWaitingDoesNotLogPeriodicCountdown(t *testing.T) {
+	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
+	pane := &fakePane{screen: "working\n"}
+	var logs []string
+	sup := New(Options{
+		Adapter: testAdapter(t), Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		Now: clk.now,
+		Logf: func(format string, args ...any) {
+			logs = append(logs, format)
+		},
+	})
+
+	must(t, sup.tick())
+	pane.screen = "5-hour limit reached âˆ™ resets 11am\n"
+	must(t, sup.tick())
+	must(t, sup.tick())
+	for i := 0; i < 3; i++ {
+		clk.add(30 * time.Second)
+		must(t, sup.tick())
+	}
+
+	var resetLogs, countdownLogs int
+	for _, line := range logs {
+		if strings.Contains(line, "reset at ") {
+			resetLogs++
+		}
+		if strings.Contains(line, "until reset") {
+			countdownLogs++
+		}
+	}
+	if resetLogs != 1 {
+		t.Fatalf("reset entry logs = %d, want 1; logs=%v", resetLogs, logs)
+	}
+	if countdownLogs != 0 {
+		t.Fatalf("periodic countdown logs = %d, want 0; logs=%v", countdownLogs, logs)
 	}
 }
 
