@@ -102,9 +102,14 @@ Run flags:
   --no-auto-detach   do NOT auto-detach when you attach to the session
   --no-notify        disable desktop notifications
 
+The trailing "-- launch-command..." is optional: omit it to use the adapter's
+default command (the "claude" adapter runs "claude"). Pass it only to launch
+something different — your own flags, a wrapper, or another binary.
+
 Examples:
-  agentkeeper run --agent claude --name feature-x -- claude
-  agentkeeper run --agent codex --prompt "Continue; run the tests." -- codex
+  agentkeeper run --agent claude --name feature-x
+  agentkeeper run --agent codex --prompt "Continue; run the tests."
+  agentkeeper run --agent claude -- claude --model opus   # custom launch command
   agentkeeper attach-existing --agent claude --target mywork:0.1
   agentkeeper parse --agent claude "5-hour limit reached ∙ resets 2pm"
   agentkeeper status

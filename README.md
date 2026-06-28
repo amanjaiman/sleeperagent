@@ -72,10 +72,10 @@ Optional extras: a local [Ollama](https://ollama.com) for `--reprompt`; `notify-
 
 ```bash
 # Launch claude, watch it, and auto-resume when the limit resets
-agentkeeper run --agent claude --name mytask -- claude
+agentkeeper run --agent claude --name mytask
 ```
 
-Everything after `--` is the command to launch (it overrides the adapter default, so you can pass your own flags). Press `d` to detach, or just leave it running. Run `agentkeeper` with no arguments for the built-in help.
+`--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Press `d` to detach, or just leave it running. Run `agentkeeper` with no arguments for the built-in help.
 
 ---
 
@@ -83,7 +83,7 @@ Everything after `--` is the command to launch (it overrides the adapter default
 
 | Command | Description |
 |---|---|
-| `run [flags] -- <cmd…>` | Launch an agent and watch it. The main mode. |
+| `run [flags] [-- <cmd…>]` | Launch an agent and watch it. The main mode. The trailing `-- <cmd…>` is optional — omit it to use the adapter's default command. |
 | `attach-existing --target T [flags]` | Watch an agent **already running** in a tmux session (also the crash-recovery path). |
 | `status [--name N]` | Report each instance's state, reset countdown, and prompt preview. |
 | `detach --name N` | Stop watching; keep the session (tmux) running. |
@@ -114,17 +114,20 @@ Everything after `--` is the command to launch (it overrides the adapter default
 
 ```bash
 # Codex with a custom static resume prompt
-agentkeeper run --agent codex --prompt "Continue; run the tests after." -- codex
+agentkeeper run --agent codex --prompt "Continue; run the tests after."
 
 # Let a local model write the continuation instruction each reset
-agentkeeper run --agent claude --reprompt ollama:llama3.1 -- claude
+agentkeeper run --agent claude --reprompt ollama:llama3.1
 
 # Run in the background and check on it later (works on all platforms)
-agentkeeper run --agent claude --name nightly --daemon -- claude
+agentkeeper run --agent claude --name nightly --daemon
 agentkeeper status
 
 # Just nudge me at the reset — don't auto-resume
-agentkeeper run --agent claude --watch-only -- claude
+agentkeeper run --agent claude --watch-only
+
+# Custom launch command — same Claude adapter, but your own flags / wrapper / binary
+agentkeeper run --agent claude -- claude --model opus --add-dir ../shared-lib
 
 # Watch an agent you started yourself in tmux
 agentkeeper attach-existing --agent claude --target mywork:0.1
