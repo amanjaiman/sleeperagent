@@ -249,14 +249,12 @@ func TestWatchOnlyDetachesAtResetWithoutInjecting(t *testing.T) {
 
 func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
 	menu := readParserTestdata(t, "claude_rate_limit_options.txt")
-	pane := &fakePane{screen: "Claude usage limit reached. Your limit will reset at 11am.
-" + menu}
+	pane := &fakePane{screen: "Claude usage limit reached. Your limit will reset at 11am.\n" + menu}
 	ad, err := adapter.Compile("claude", adapter.Spec{
-		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^
-.]+)`},
+		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^\r\n.]+)`},
 		AutoResponses: []adapter.AutoResponseSpec{{
 			Pattern: `(?i)rate.?limit.?options|stop and wait for (?:the|your) limit to reset`,
-			Keys:    "1",
+			Keys:    "1\r",
 			Once:    true,
 		}},
 	})
@@ -272,8 +270,8 @@ func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
 	must(t, sup.tick())
 	must(t, sup.tick())
 
-	if len(pane.injected) != 1 || pane.injected[0] != "1" {
-		t.Fatalf("auto-response injected = %q, want one %q", pane.injected, "1\r")
+	if len(pane.injected) != 1 || pane.injected[0] != "1\r" {
+		t.Fatalf("auto-response injected = %q, want one %q", pane.injected, "1\\r")
 	}
 	if pane.styles[0] != adapter.InjectKeys {
 		t.Fatalf("style = %q, want %q", pane.styles[0], adapter.InjectKeys)
@@ -281,16 +279,12 @@ func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
 }
 
 func TestAutoResponseAmbiguousMenuNotifiesWithoutInjecting(t *testing.T) {
-	pane := &fakePane{screen: "/rate-limit-options
-1. Upgrade plan
-2. Switch model
-"}
+	pane := &fakePane{screen: "/rate-limit-options\n1. Upgrade plan\n2. Switch model\n"}
 	ad, err := adapter.Compile("claude", adapter.Spec{
-		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^
-.]+)`},
+		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^\r\n.]+)`},
 		AutoResponses: []adapter.AutoResponseSpec{{
 			Pattern: `(?i)rate.?limit.?options`,
-			Keys:    "1",
+			Keys:    "1\r",
 			Once:    true,
 		}},
 	})
@@ -318,8 +312,7 @@ func TestAutoResponseAmbiguousMenuNotifiesWithoutInjecting(t *testing.T) {
 
 func TestWaitingDoesNotLogPeriodicCountdown(t *testing.T) {
 	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
-	pane := &fakePane{screen: "working
-"}
+	pane := &fakePane{screen: "working\n"}
 	var logs []string
 	sup := New(Options{
 		Adapter: testAdapter(t), Tmux: pane, Prompt: prompt.NewStatic("continue"),
@@ -331,8 +324,7 @@ func TestWaitingDoesNotLogPeriodicCountdown(t *testing.T) {
 	})
 
 	must(t, sup.tick())
-	pane.screen = "5-hour limit reached ∙ resets 11am
-"
+	pane.screen = "5-hour limit reached ∙ resets 11am\n"
 	must(t, sup.tick())
 	must(t, sup.tick())
 	for i := 0; i < 3; i++ {
