@@ -155,9 +155,22 @@ func (c *Client) Foreground(ctx context.Context) error {
 	return nil
 }
 
+// Wait blocks until the agent exits or ctx is cancelled.
+func (c *Client) Wait(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-c.done:
+	}
+}
+
 // Close releases the pty.
 func (c *Client) Close() {
+	if c.echo {
+		restoreTerminal()
+		c.echo = false
+	}
 	if c.ptmx != nil {
 		c.ptmx.Close()
+		c.ptmx = nil
 	}
 }

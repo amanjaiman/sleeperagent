@@ -183,8 +183,10 @@ func runCmd(args []string) error {
 	// pty (no-tmux fallback, reduced handoff).
 	var pane supervisor.Pane
 	var startSession func() error
+	var foreground func(ctx context.Context)
 	var afterDetach func(ctx context.Context)
 	var attachHint string
+	var restoreLogOutput func()
 	switch *backend {
 	case "tmux":
 		tx := tmux.New(instance, "")
@@ -205,6 +207,12 @@ func runCmd(args []string) error {
 			log.Printf("detached. session %q left running — reattach with: %s", instance, tx.AttachHint())
 		}
 	case "pty":
+		restore, err := redirectLogsToInstanceFile(instance)
+		if err != nil {
+			return err
+		}
+		restoreLogOutput = restore
+		defer restoreLogOutput()
 		pc, perr := ptybackend.New()
 		if perr != nil {
 			return perr
@@ -215,59 +223,72 @@ func runCmd(args []string) error {
 			log.Printf("launching %q in a pty", launch)
 			return pc.Start(launch)
 		}
-		afterDetach = func(ctx context.Context) {
-			log.Printf("handing the terminal to you; the agent runs until it exits (Ctrl-C to stop)")
+		foreground = func(ctx context.Context) {
 			_ = pc.Foreground(ctx)
+		}
+		afterDetach = func(ctx context.Context) {
+			log.Printf("detached. watchdog stopped; agent keeps this terminal until it exits")
+			pc.Wait(ctx)
 		}
 	default:
 		return fmt.Errorf("unknown backend %q (use \"tmux\" or \"pty\")", *backend)
 	}
 
 	return watchSession(watchParams{
-		instance:     instance,
-		agent:        *agent,
-		adapter:      ad,
-		pane:         pane,
-		attachHint:   attachHint,
-		startSession: startSession,
-		afterDetach:  afterDetach,
-		builder:      builder,
-		promptMode:   promptMode,
-		resumeText:   resumeText,
-		cfg:          cfg,
-		cwd:          cwd,
-		autoDetach:   !*noAutoDetach,
-		watchOnly:    *watchOnly,
-		notifier:     buildNotifier(*noNotify, *webhookURL),
+		instance:       instance,
+		agent:          *agent,
+		adapter:        ad,
+		pane:           pane,
+		attachHint:     attachHint,
+		startSession:   startSession,
+		foreground:     foreground,
+		afterDetach:    afterDetach,
+		builder:        builder,
+		promptMode:     promptMode,
+		resumeText:     resumeText,
+		cfg:            cfg,
+		cwd:            cwd,
+		autoDetach:     !*noAutoDetach,
+		watchOnly:      *watchOnly,
+		notifier:       buildNotifier(*noNotify, *webhookURL),
+		transparentTTY: *backend == "pty",
 	})
 }
 
 // watchParams bundles everything watchSession needs so both `run` and
 // `attach-existing` share the same observe/wait/resume core.
 type watchParams struct {
-	instance     string
-	agent        string
-	adapter      *adapter.Adapter
-	pane         supervisor.Pane
-	attachHint   string
-	startSession func() error // nil when the session already exists (attach-existing)
-	afterDetach  func(ctx context.Context)
-	builder      prompt.Builder
-	promptMode   string
-	resumeText   string
-	cfg          config.Config
-	cwd          string
-	autoDetach   bool
-	watchOnly    bool
-	notifier     notify.Notifier
+	instance       string
+	agent          string
+	adapter        *adapter.Adapter
+	pane           supervisor.Pane
+	attachHint     string
+	startSession   func() error // nil when the session already exists (attach-existing)
+	foreground     func(ctx context.Context)
+	afterDetach    func(ctx context.Context)
+	builder        prompt.Builder
+	promptMode     string
+	resumeText     string
+	cfg            config.Config
+	cwd            string
+	autoDetach     bool
+	watchOnly      bool
+	notifier       notify.Notifier
+	transparentTTY bool
 }
 
 // watchSession runs the supervisor loop against an already-prepared backend.
 func watchSession(p watchParams) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	if p.startSession != nil {
 		if err := p.startSession(); err != nil {
 			return err
 		}
+	}
+	if p.foreground != nil {
+		go p.foreground(ctx)
 	}
 	log.Printf("watching. take over any time with: %s", p.attachHint)
 	if p.watchOnly {
@@ -276,7 +297,11 @@ func watchSession(p watchParams) error {
 	if p.promptMode != "static" {
 		log.Printf("reprompt: %s enabled (falls back to static prompt on any failure)", p.promptMode)
 	}
-	log.Printf("%s", hotkeys.Legend)
+	if p.transparentTTY {
+		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; use `agentkeeper detach --name %s` or `agentkeeper stop --name %s` from another shell", p.instance, p.instance)
+	} else {
+		log.Printf("%s", hotkeys.Legend)
+	}
 
 	var prevState string
 	writeRecord := func(snap supervisor.Snapshot) {
@@ -304,12 +329,9 @@ func watchSession(p watchParams) error {
 
 	cmds := make(chan supervisor.Command, 4)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	// Foreground hotkeys (no-op when stdin isn't a TTY). Raw mode needs CRLF, so
 	// route the logger through a translating writer while hotkeys are active.
-	if hotkeys.Listen(ctx, cmds, log.Printf) {
+	if !p.transparentTTY && hotkeys.Listen(ctx, cmds, log.Printf) {
 		log.SetOutput(crlfWriter{os.Stderr})
 		defer log.SetOutput(os.Stderr)
 	}
@@ -448,6 +470,23 @@ func daemonize(instance string, runArgs []string) error {
 	fmt.Printf("  status: agentkeeper status --name %s\n", instance)
 	fmt.Printf("  stop:   agentkeeper detach --name %s   (or: stop --name %s --kill)\n", instance, instance)
 	return nil
+}
+
+func redirectLogsToInstanceFile(instance string) (func(), error) {
+	logPath := filepath.Join(statefile.Dir(), instance+".log")
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return nil, err
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	prev := log.Writer()
+	log.SetOutput(logFile)
+	return func() {
+		log.SetOutput(prev)
+		_ = logFile.Close()
+	}, nil
 }
 
 // attachExistingCmd watches an agent already running in a tmux session, without
