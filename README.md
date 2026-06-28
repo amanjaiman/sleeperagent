@@ -87,8 +87,9 @@ agentkeeper run --agent claude --name mytask
 | `attach-existing --target T [flags]` | Watch an agent **already running** in a tmux session (also the crash-recovery path). |
 | `status [--name N]` | Report each instance's state, reset countdown, and prompt preview. |
 | `logs --name N [--follow]` | Print (or `-f`/`--follow` to tail) an instance's supervisor log. |
-| `detach --name N` | Stop watching; keep the session (tmux) running. |
-| `stop --name N [--kill]` | Stop watching; `--kill` also terminates the session. |
+| `detach --name N` | Stop watching; keep the session (tmux) running. If the supervisor already exited, cleans up its stale record. |
+| `stop --name N [--kill]` | Stop watching; `--kill` also terminates the session. If the supervisor already exited, cleans up its stale record. |
+| `rm --name N [--force]` / `rm --all` | Remove a stale/ended instance record (e.g. after the agent exited). `--all` prunes every record with no running supervisor. |
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
 | `parse --agent A "text…"` | Test a captured limit string against an agent's patterns and show the resolved reset. |
 | `install [--dir DIR] [--force]` | Copy this binary to a PATH directory. |

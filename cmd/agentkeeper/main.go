@@ -61,6 +61,8 @@ func main() {
 		err = controlCmd(os.Args[2:], "detach")
 	case "stop":
 		err = stopCmd(os.Args[2:])
+	case "rm":
+		err = rmCmd(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Printf("agentkeeper %s\n", version)
 	case "-h", "--help", "help":
@@ -88,6 +90,7 @@ Usage:
   agentkeeper logs            --name NAME [--follow]          print / tail the instance log
   agentkeeper detach          --name NAME                     stop watching, keep session
   agentkeeper stop            --name NAME [--kill]             stop watching (optionally kill)
+  agentkeeper rm              --name NAME [--force] | --all    remove a stale/ended instance record
   agentkeeper version                                         print version
 
 Run flags:
@@ -761,6 +764,18 @@ func resetCol(r statefile.Record) string {
 	return fmt.Sprintf("%s (in %s)", r.WaitUntil.Local().Format("15:04"), d.Round(time.Second))
 }
 
+// cleanupIfDead removes an instance's stale record when its supervisor process
+// is no longer running, returning true if it handled the (dead) instance. This
+// is what lets stop/detach tidy up an instance that already ended on its own
+// instead of writing a control command no live supervisor will ever read.
+func cleanupIfDead(rec statefile.Record) bool {
+	if processAlive(rec.PID) {
+		return false
+	}
+	statefile.Remove(rec.Name)
+	return true
+}
+
 func controlCmd(args []string, command string) error {
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	name := fs.String("name", "", "instance name")
@@ -770,8 +785,13 @@ func controlCmd(args []string, command string) error {
 	if *name == "" {
 		return fmt.Errorf("--name is required")
 	}
-	if _, err := statefile.Read(*name); err != nil {
+	rec, err := statefile.Read(*name)
+	if err != nil {
 		return fmt.Errorf("no such instance %q", *name)
+	}
+	if cleanupIfDead(rec) {
+		fmt.Printf("%q was not running (last state: %s); cleaned up its record\n", *name, rec.State)
+		return nil
 	}
 	if err := statefile.WriteControl(*name, command); err != nil {
 		return err
@@ -790,8 +810,16 @@ func stopCmd(args []string) error {
 	if *name == "" {
 		return fmt.Errorf("--name is required")
 	}
-	if _, err := statefile.Read(*name); err != nil {
+	rec, err := statefile.Read(*name)
+	if err != nil {
 		return fmt.Errorf("no such instance %q", *name)
+	}
+	if cleanupIfDead(rec) {
+		fmt.Printf("%q was not running (last state: %s); cleaned up its record\n", *name, rec.State)
+		if *kill && rec.Session != "" {
+			fmt.Printf("(if a tmux session %q is somehow still alive, kill it with: tmux kill-session -t %s)\n", rec.Session, rec.Session)
+		}
+		return nil
 	}
 	cmd := "detach"
 	if *kill {
@@ -801,6 +829,47 @@ func stopCmd(args []string) error {
 		return err
 	}
 	fmt.Printf("%s requested for %q\n", cmd, *name)
+	return nil
+}
+
+// rmCmd removes instance records. By default it refuses to remove a record whose
+// supervisor still appears to be running (that would orphan it from status and
+// control); --force overrides. --all prunes every record with no live supervisor.
+func rmCmd(args []string) error {
+	fs := flag.NewFlagSet("rm", flag.ContinueOnError)
+	name := fs.String("name", "", "instance name")
+	all := fs.Bool("all", false, "remove every record whose supervisor is not running")
+	force := fs.Bool("force", false, "remove even if the supervisor appears to be running")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *all {
+		recs, err := statefile.List()
+		if err != nil {
+			return err
+		}
+		removed := 0
+		for _, r := range recs {
+			if *force || !processAlive(r.PID) {
+				statefile.Remove(r.Name)
+				removed++
+			}
+		}
+		fmt.Printf("removed %d record(s)\n", removed)
+		return nil
+	}
+	if *name == "" {
+		return fmt.Errorf("--name or --all is required")
+	}
+	rec, err := statefile.Read(*name)
+	if err != nil {
+		return fmt.Errorf("no such instance %q", *name)
+	}
+	if processAlive(rec.PID) && !*force {
+		return fmt.Errorf("%q still has a running supervisor (pid %d); stop it with `agentkeeper stop --name %s --kill` first, or pass --force", *name, rec.PID, *name)
+	}
+	statefile.Remove(*name)
+	fmt.Printf("removed record for %q\n", *name)
 	return nil
 }
 
