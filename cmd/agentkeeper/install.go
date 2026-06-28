@@ -95,17 +95,35 @@ func installExecutable(src, target string, force bool) (string, error) {
 		return "", err
 	}
 
+	// Clean up any binary sidelined by a previous in-place update (see below).
+	aside := target + ".old"
+	_ = os.Remove(aside)
+
 	tmp := target + ".tmp"
 	if err := copyFile(src, tmp, srcInfo.Mode()|0o755); err != nil {
 		return "", err
 	}
-	if force {
-		_ = os.Remove(target)
+
+	// Fast path: move straight into place. Works when the target is absent or not
+	// locked (no running instance is using it).
+	if err := os.Rename(tmp, target); err == nil {
+		return "installed", nil
+	}
+
+	// In-use path: Windows locks a running .exe against overwrite/delete, but it
+	// can still be renamed. Move the old binary aside, then the new one into
+	// place, so you can update while an instance is still being watched. The
+	// sidelined copy is removed on the next install, once the old process exits.
+	if err := os.Rename(target, aside); err != nil {
+		_ = os.Remove(tmp)
+		return "", fmt.Errorf("replace %s (is it in use? close other agentkeeper processes or pass a fresh --dir): %w", target, err)
 	}
 	if err := os.Rename(tmp, target); err != nil {
+		_ = os.Rename(aside, target) // restore the original on failure
 		_ = os.Remove(tmp)
-		return "", err
+		return "", fmt.Errorf("install to %s: %w", target, err)
 	}
+	_ = os.Remove(aside) // best-effort; harmless if the old binary is still locked
 	return "installed", nil
 }
 
