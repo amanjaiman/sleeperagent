@@ -55,6 +55,8 @@ func main() {
 		err = installCmd(os.Args[2:])
 	case "status":
 		err = statusCmd(os.Args[2:])
+	case "logs":
+		err = logsCmd(os.Args[2:])
 	case "detach":
 		err = controlCmd(os.Args[2:], "detach")
 	case "stop":
@@ -83,6 +85,7 @@ Usage:
   agentkeeper parse           --agent A "limit text..."       test a limit string against patterns
   agentkeeper install         [--dir DIR] [--force]           copy this binary to a PATH directory
   agentkeeper status          [--name NAME]                   report state / countdown
+  agentkeeper logs            --name NAME [--follow]          print / tail the instance log
   agentkeeper detach          --name NAME                     stop watching, keep session
   agentkeeper stop            --name NAME [--kill]             stop watching (optionally kill)
   agentkeeper version                                         print version
@@ -306,7 +309,7 @@ func watchSession(p watchParams) error {
 		log.Printf("reprompt: %s enabled (falls back to static prompt on any failure)", p.promptMode)
 	}
 	if p.transparentTTY {
-		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; use `agentkeeper detach --name %s` or `agentkeeper stop --name %s` from another shell", p.instance, p.instance)
+		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; from another shell use `agentkeeper logs --name %s -f`, `agentkeeper status`, or `agentkeeper detach/stop --name %s`", p.instance, p.instance)
 	} else {
 		log.Printf("%s", hotkeys.Legend)
 	}
@@ -447,7 +450,7 @@ func daemonize(instance string, runArgs []string) error {
 	if err != nil {
 		return err
 	}
-	logPath := filepath.Join(statefile.Dir(), instance+".log")
+	logPath := instanceLogPath(instance)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return err
 	}
@@ -474,14 +477,14 @@ func daemonize(instance string, runArgs []string) error {
 	_ = statefile.Write(statefile.Record{Name: instance, State: "RUNNING", PID: pid})
 
 	fmt.Printf("agentkeeper: %q started in background (pid %d)\n", instance, pid)
-	fmt.Printf("  logs:   %s\n", logPath)
+	fmt.Printf("  logs:   agentkeeper logs --name %s --follow   (file: %s)\n", instance, logPath)
 	fmt.Printf("  status: agentkeeper status --name %s\n", instance)
 	fmt.Printf("  stop:   agentkeeper detach --name %s   (or: stop --name %s --kill)\n", instance, instance)
 	return nil
 }
 
 func redirectLogsToInstanceFile(instance string) (func(), error) {
-	logPath := filepath.Join(statefile.Dir(), instance+".log")
+	logPath := instanceLogPath(instance)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return nil, err
 	}

@@ -86,6 +86,7 @@ agentkeeper run --agent claude --name mytask
 | `run [flags] [-- <cmd…>]` | Launch an agent and watch it. The main mode. The trailing `-- <cmd…>` is optional — omit it to use the adapter's default command. |
 | `attach-existing --target T [flags]` | Watch an agent **already running** in a tmux session (also the crash-recovery path). |
 | `status [--name N]` | Report each instance's state, reset countdown, and prompt preview. |
+| `logs --name N [--follow]` | Print (or `-f`/`--follow` to tail) an instance's supervisor log. |
 | `detach --name N` | Stop watching; keep the session (tmux) running. |
 | `stop --name N [--kill]` | Stop watching; `--kill` also terminates the session. |
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
