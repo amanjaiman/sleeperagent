@@ -199,6 +199,19 @@ func TestParseClockNoMatch(t *testing.T) {
 	}
 }
 
+func TestIsNextDayRollForward(t *testing.T) {
+	prev := refNow(t, "19:11")
+	if !IsNextDayRollForward(prev.Add(24*time.Hour+30*time.Second), prev, time.Minute) {
+		t.Fatal("expected previous+24h within tolerance to be recognized")
+	}
+	if IsNextDayRollForward(prev.Add(25*time.Hour), prev, time.Minute) {
+		t.Fatal("different future reset must not be recognized as a roll-forward ghost")
+	}
+	if IsNextDayRollForward(time.Time{}, prev, time.Minute) {
+		t.Fatal("zero reset must not be recognized")
+	}
+}
+
 func TestParseDuration(t *testing.T) {
 	cases := []struct {
 		in   string

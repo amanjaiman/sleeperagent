@@ -133,6 +133,23 @@ func rollForward(now time.Time, hour, minute int) time.Time {
 	return t
 }
 
+// IsNextDayRollForward reports whether reset is effectively previous+24h. A
+// bare clock reset that has just passed can roll to tomorrow when stale output
+// is parsed again; callers use this to reject that already-satisfied banner.
+func IsNextDayRollForward(reset, previous time.Time, tolerance time.Duration) bool {
+	if reset.IsZero() || previous.IsZero() {
+		return false
+	}
+	if tolerance < 0 {
+		tolerance = -tolerance
+	}
+	delta := reset.Sub(previous.Add(24 * time.Hour))
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta <= tolerance
+}
+
 // durationWord matches one "<number><unit>" token, e.g. "2h", "30 minutes". No
 // trailing word boundary, so compact concatenations like "2h30m" parse fully.
 var durationWord = regexp.MustCompile(`(?i)(\d+)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?|h|m|s)`)

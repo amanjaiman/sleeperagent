@@ -387,6 +387,7 @@ func watchSession(p watchParams) error {
 	if sup.SessionEnded() {
 		// The agent exited or the session was killed out from under us; there is
 		// no live session to hand back, so skip the reattach hint.
+		statefile.Remove(p.instance)
 		log.Printf("session %q ended — the agent exited. Nothing left to watch.", p.instance)
 		return nil
 	}

@@ -177,6 +177,143 @@ func TestStaleLimitLineNotReinjected(t *testing.T) {
 	}
 }
 
+// TestResumeClearsResetState verifies that once a resume is confirmed the reset
+// and wait times are cleared, so `agentkeeper status` no longer shows a stale
+// WAITING countdown.
+func TestResumeClearsResetState(t *testing.T) {
+	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
+	pane := &fakePane{screen: "working...\n"}
+	pane.onInject = func(string) string { return "resumed, working again\n" }
+
+	var last Snapshot
+	sup := New(Options{
+		Adapter:      testAdapter(t),
+		Tmux:         pane,
+		Prompt:       prompt.NewStatic("continue"),
+		PollInterval: time.Second,
+		ResetBuffer:  60 * time.Second,
+		MaxWait:      24 * time.Hour,
+		Now:          clk.now,
+		OnUpdate:     func(s Snapshot) { last = s },
+	})
+
+	must(t, sup.tick()) // RUNNING
+	pane.screen = "5-hour limit reached ∙ resets 11am\n"
+	must(t, sup.tick()) // LIMITED
+	must(t, sup.tick()) // WAITING
+	if last.WaitUntil.IsZero() {
+		t.Fatal("expected a wait time while WAITING")
+	}
+	clk.add(2 * time.Hour)
+	must(t, sup.tick()) // -> RESUMING
+	clk.add(3 * time.Second)
+	must(t, sup.tick()) // idle -> inject
+	must(t, sup.tick()) // resume confirmed -> RUNNING
+
+	if sup.State() != state.Running {
+		t.Fatalf("state = %s, want RUNNING", sup.State())
+	}
+	if !last.WaitUntil.IsZero() || !last.Reset.Time.IsZero() {
+		t.Fatalf("reset state not cleared after resume: %+v", last)
+	}
+}
+
+func TestPostResumeStaleClockBannerDoesNotRearmNextDay(t *testing.T) {
+	clk := &driveClock{t: time.Date(2026, 6, 26, 19, 0, 0, 0, time.Local)}
+	pane := &fakePane{screen: "working...\n"}
+	pane.onInject = func(string) string { return "resumed, working again\n" }
+
+	ad, err := adapter.Compile("claude", adapter.Spec{
+		LimitPatterns: []string{`(?i)hit your session limit.*resets\s+(?P<time>[^\r\n]+)`},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		Now: clk.now,
+	})
+
+	must(t, sup.tick()) // RUNNING
+	pane.screen = "You've hit your session limit. Your limit resets 7:01pm\n"
+	must(t, sup.tick()) // LIMITED
+	must(t, sup.tick()) // WAITING
+	clk.add(2 * time.Minute)
+	must(t, sup.tick()) // RESUMING
+	clk.add(3 * time.Second)
+	must(t, sup.tick()) // inject
+	must(t, sup.tick()) // resume confirmed
+
+	if sup.State() != state.Running {
+		t.Fatalf("state = %s, want RUNNING after resume", sup.State())
+	}
+
+	// The same bare reset time is still rendered, but with different text, so
+	// byte-for-byte handledMatch dedupe cannot catch it. It must not roll to
+	// tomorrow and re-enter WAITING.
+	pane.screen = "You've hit your session limit again. Your limit resets 7:01pm\n"
+	must(t, sup.tick()) // post-resume cooldown suppresses immediate re-arm
+	clk.add(3 * time.Second)
+	must(t, sup.tick()) // next-day roll-forward guard suppresses it after cooldown
+
+	if sup.State() != state.Running {
+		t.Fatalf("state = %s, want RUNNING for stale post-resume banner", sup.State())
+	}
+	if !sup.waitUntil.IsZero() || !sup.reset.Time.IsZero() {
+		t.Fatalf("stale banner re-armed reset state: reset=%+v waitUntil=%v", sup.reset, sup.waitUntil)
+	}
+	if len(pane.injected) != 1 {
+		t.Fatalf("injected %d times %v, want only the resume prompt", len(pane.injected), pane.injected)
+	}
+}
+
+func TestNewLimitAfterResumeStillDetected(t *testing.T) {
+	clk := &driveClock{t: time.Date(2026, 6, 26, 19, 0, 0, 0, time.Local)}
+	pane := &fakePane{screen: "working...\n"}
+	pane.onInject = func(string) string { return "resumed, working again\n" }
+
+	ad, err := adapter.Compile("claude", adapter.Spec{
+		LimitPatterns: []string{`(?i)hit your session limit.*resets\s+(?P<time>[^\r\n]+)`},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		Now: clk.now,
+	})
+
+	must(t, sup.tick())
+	pane.screen = "You've hit your session limit. Your limit resets 7:01pm\n"
+	must(t, sup.tick())
+	must(t, sup.tick())
+	clk.add(2 * time.Minute)
+	must(t, sup.tick())
+	clk.add(3 * time.Second)
+	must(t, sup.tick())
+	must(t, sup.tick())
+	if sup.State() != state.Running {
+		t.Fatalf("state = %s, want RUNNING after resume", sup.State())
+	}
+
+	clk.add(3 * time.Second) // beyond post-resume cooldown
+	pane.screen = "You've hit your session limit. Your limit resets 8:30pm\n"
+	must(t, sup.tick()) // RUNNING -> LIMITED
+	if sup.State() != state.Limited {
+		t.Fatalf("state = %s, want LIMITED for a real new future limit", sup.State())
+	}
+	must(t, sup.tick()) // LIMITED -> WAITING
+	if sup.State() != state.Waiting {
+		t.Fatalf("state = %s, want WAITING for a real new future limit", sup.State())
+	}
+	want := time.Date(2026, 6, 26, 20, 30, 1, 0, time.Local)
+	if !sup.waitUntil.Equal(want) {
+		t.Fatalf("waitUntil = %v, want %v", sup.waitUntil, want)
+	}
+}
+
 // TestReLimitBackoff verifies that when a resume immediately re-hits a fresh
 // limit, the next wait includes the progressive backoff on top of the reset.
 func TestReLimitBackoff(t *testing.T) {

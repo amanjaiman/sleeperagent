@@ -68,6 +68,14 @@ const maxInjectAttempts = 3
 // hammering the agent.
 const reLimitBackoffStep = 30 * time.Second
 
+// postResumeLimitCooldownPolls is a short quiet period after a confirmed resume
+// where stale, still-rendered banners are observed but not re-armed.
+const postResumeLimitCooldownPolls = 2
+
+// resetRollForwardTolerance absorbs clock/parser granularity when comparing a
+// stale bare-clock reset that rolled to the next day.
+const resetRollForwardTolerance = 2 * time.Minute
+
 // scrollback is how many history lines the watcher captures each poll, so a
 // limit message that just scrolled off-screen is still seen.
 const scrollback = 100
@@ -120,6 +128,8 @@ type Supervisor struct {
 	groups         map[string]string
 	currentMatch   string // the limit line that triggered the active event
 	handledMatch   string // last fully-handled limit line, still lingering in scrollback
+	lastReset      time.Time
+	limitCooldown  time.Time
 	reset          parser.ResetInfo
 	waitUntil      time.Time
 	limitLatched   bool
@@ -339,6 +349,11 @@ func (s *Supervisor) onRunning(capture string, now time.Time) {
 	// Ignore the same limit line we already handled and that is still sitting in
 	// the captured scrollback — it is not a new limit event.
 	if match == s.handledMatch {
+		s.scanAutoResponses(capture)
+		return
+	}
+	if s.ignorePostResumeLimit(groups, now) {
+		s.scanAutoResponses(capture)
 		return
 	}
 	s.limitLatched = true
@@ -372,6 +387,19 @@ func (s *Supervisor) onLimited(capture string, now time.Time) {
 		return
 	}
 	s.st = state.Waiting
+}
+
+func (s *Supervisor) ignorePostResumeLimit(groups map[string]string, now time.Time) bool {
+	reset := parser.Resolve(groups, now, fallbackWindow)
+	if !s.limitCooldown.IsZero() && now.Before(s.limitCooldown) {
+		s.opt.Logf("ignoring limit detection during post-resume cooldown")
+		return true
+	}
+	if reset.Source == parser.SourceClock && parser.IsNextDayRollForward(reset.Time, s.lastReset, resetRollForwardTolerance) {
+		s.opt.Logf("ignoring stale limit banner that rolled forward to the next day")
+		return true
+	}
+	return false
 }
 
 func (s *Supervisor) scanAutoResponses(capture string) {
@@ -466,22 +494,36 @@ func (s *Supervisor) onResuming(capture string, now time.Time) error {
 			return nil
 		}
 		s.opt.Logf("resume confirmed; back to running")
-		s.handledMatch = s.currentMatch
-		s.limitLatched = false
-		s.limitCycles = 0
-		s.st = state.Running
+		s.resumeConfirmed()
 		return nil
 	}
 
 	// No change yet. Re-inject after a couple of stable polls, up to the cap.
 	if s.injectAttempts >= maxInjectAttempts {
 		s.opt.Logf("resume prompt did not visibly take after %d attempts; assuming sent and resuming watch", s.injectAttempts)
-		s.limitLatched = false
-		s.st = state.Running
+		s.resumeConfirmed()
 		return nil
 	}
 	s.injected = false // allow re-injection next tick
 	return nil
+}
+
+// resumeConfirmed clears the per-limit-event scratch and returns to RUNNING.
+// Crucially it also clears the resolved reset/wait times so `agentkeeper status`
+// no longer shows a stale WAITING countdown once the agent is working again.
+func (s *Supervisor) resumeConfirmed() {
+	s.handledMatch = s.currentMatch
+	if !s.reset.Time.IsZero() {
+		s.lastReset = s.reset.Time
+	}
+	s.limitCooldown = s.opt.Now().Add(time.Duration(postResumeLimitCooldownPolls) * s.opt.PollInterval)
+	s.limitLatched = false
+	s.limitCycles = 0
+	s.injected = false
+	s.injectAttempts = 0
+	s.reset = parser.ResetInfo{}
+	s.waitUntil = time.Time{}
+	s.st = state.Running
 }
 
 // idle reports whether the agent is ready for input. If the adapter defines an
