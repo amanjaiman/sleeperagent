@@ -1,6 +1,7 @@
 # AgentKeeper
 
 [![CI](https://github.com/amanjaiman/agentkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/agentkeeper/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/amanjaiman/agentkeeper)](https://github.com/amanjaiman/agentkeeper/releases)
 [![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/agentkeeper.svg)](https://pkg.go.dev/github.com/amanjaiman/agentkeeper)
 [![Go Report Card](https://goreportcard.com/badge/github.com/amanjaiman/agentkeeper)](https://goreportcard.com/report/github.com/amanjaiman/agentkeeper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -134,6 +135,9 @@ agentkeeper run --agent claude -- claude --model opus --add-dir ../shared-lib
 
 # Watch an agent you started yourself in tmux
 agentkeeper attach-existing --agent claude --target mywork:0.1
+
+# Same, but for a Codex session running in another tmux pane
+agentkeeper attach-existing --agent codex --target mywork:0.2
 
 # Validate a limit pattern against text you copied from your real CLI
 agentkeeper parse --agent claude "5-hour limit reached ∙ resets 2pm"
