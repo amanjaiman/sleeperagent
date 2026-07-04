@@ -57,10 +57,21 @@ EOF
 chmod +x "$AGENT"
 
 echo "== launching with --backend pty --webhook =="
-# Drive a pty for the supervisor's own stdin via script, so it has a controlling tty.
-script -qfc "$BIN run --agent fake --name ak-pty-$$ --backend pty --no-notify --config $CFG --webhook http://127.0.0.1:$PORT --prompt pty-continue -- $AGENT" /tmp/ak_pty.log >/dev/null 2>&1 &
+# Drive a pty for the supervisor's own stdin via script, so it has a controlling
+# tty; force TERM in case the CI shell's is one raw-mode setup doesn't like.
+TERM=xterm script -qfc "$BIN run --agent fake --name ak-pty-$$ --backend pty --no-notify --config $CFG --webhook http://127.0.0.1:$PORT --prompt pty-continue -- $AGENT" /tmp/ak_pty.log >/dev/null 2>&1 &
 SUP=$!
-sleep 14
+
+# Poll for the full limit -> wait -> resume -> notify cycle to complete instead
+# of asserting after one fixed sleep, which was too tight under CI load (the
+# resume webhook fires only after the injected prompt is verified as accepted,
+# a poll or two after injection itself).
+for _ in $(seq 1 30); do
+  if grep -q "pty-continue" "$MARKER" 2>/dev/null && grep -qi "resumed" "$HOOKLOG" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
 kill "$SUP" 2>/dev/null; wait "$SUP" 2>/dev/null
 
 echo "== marker (what the agent received) =="; cat "$MARKER" 2>/dev/null
