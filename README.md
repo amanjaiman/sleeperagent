@@ -3,7 +3,6 @@
 [![CI](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/amanjaiman/sleeperagent)](https://github.com/amanjaiman/sleeperagent/releases)
 [![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg)](https://pkg.go.dev/github.com/amanjaiman/sleeperagent)
-[![Go Report Card](https://goreportcard.com/badge/github.com/amanjaiman/sleeperagent)](https://goreportcard.com/report/github.com/amanjaiman/sleeperagent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **A cross-agent watchdog that resumes Claude Code / Codex sessions when their usage limits reset — and gets out of your way the moment you want to take over.**
