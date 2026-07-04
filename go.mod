@@ -1,4 +1,4 @@
-module github.com/amanjaiman/agentkeeper
+module github.com/amanjaiman/sleeperagent
 
 go 1.23.0
 

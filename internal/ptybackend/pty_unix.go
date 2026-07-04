@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
 	"github.com/creack/pty"
 	"golang.org/x/term"
 )

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
-	"github.com/amanjaiman/agentkeeper/internal/config"
-	"github.com/amanjaiman/agentkeeper/internal/prompt"
-	"github.com/amanjaiman/agentkeeper/internal/state"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/config"
+	"github.com/amanjaiman/sleeperagent/internal/prompt"
+	"github.com/amanjaiman/sleeperagent/internal/state"
 )
 
 // fakePane is a scriptable Pane: each tick the supervisor reads the current
@@ -243,7 +243,7 @@ func TestResumeRetriesEnterWhenPromptNotSubmitted(t *testing.T) {
 }
 
 // TestResumeClearsResetState verifies that once a resume is confirmed the reset
-// and wait times are cleared, so `agentkeeper status` no longer shows a stale
+// and wait times are cleared, so `sleeperagent status` no longer shows a stale
 // WAITING countdown (the field report's third bug).
 func TestResumeClearsResetState(t *testing.T) {
 	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}

@@ -9,11 +9,11 @@ import (
 func TestInstallExecutableCopiesAndIsIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	target := filepath.Join(dir, "bin", "agentkeeper")
+	target := filepath.Join(dir, "bin", "sleeperagent")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(src, []byte("agentkeeper binary"), 0o755); err != nil {
+	if err := os.WriteFile(src, []byte("sleeperagent binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -28,7 +28,7 @@ func TestInstallExecutableCopiesAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "agentkeeper binary" {
+	if string(got) != "sleeperagent binary" {
 		t.Fatalf("installed content = %q", got)
 	}
 
@@ -44,8 +44,8 @@ func TestInstallExecutableCopiesAndIsIdempotent(t *testing.T) {
 func TestInstallExecutableRefusesDifferentExistingWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	target := filepath.Join(dir, "agentkeeper")
-	if err := os.WriteFile(src, []byte("agentkeeper binary"), 0o755); err != nil {
+	target := filepath.Join(dir, "sleeperagent")
+	if err := os.WriteFile(src, []byte("sleeperagent binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(target, []byte("different tool"), 0o755); err != nil {
@@ -67,8 +67,8 @@ func TestInstallExecutableRefusesDifferentExistingWithoutForce(t *testing.T) {
 func TestInstallExecutableForceOverwritesDifferentExisting(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	target := filepath.Join(dir, "agentkeeper")
-	if err := os.WriteFile(src, []byte("agentkeeper binary"), 0o755); err != nil {
+	target := filepath.Join(dir, "sleeperagent")
+	if err := os.WriteFile(src, []byte("sleeperagent binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(target, []byte("different tool"), 0o755); err != nil {
@@ -86,16 +86,16 @@ func TestInstallExecutableForceOverwritesDifferentExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "agentkeeper binary" {
+	if string(got) != "sleeperagent binary" {
 		t.Fatalf("target content = %q", got)
 	}
 }
 
 func TestInstallName(t *testing.T) {
-	if got := installName("windows"); got != "agentkeeper.exe" {
+	if got := installName("windows"); got != "sleeperagent.exe" {
 		t.Fatalf("windows name = %q", got)
 	}
-	if got := installName("linux"); got != "agentkeeper" {
+	if got := installName("linux"); got != "sleeperagent" {
 		t.Fatalf("unix name = %q", got)
 	}
 }

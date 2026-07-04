@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
 )
 
 // Client drives a single tmux session identified by its name. The session's

@@ -1,6 +1,6 @@
-# AgentKeeper build tasks.
-BINARY      := agentkeeper
-PKG         := ./cmd/agentkeeper
+# SleeperAgent build tasks.
+BINARY      := sleeperagent
+PKG         := ./cmd/sleeperagent
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS     := -s -w -X main.version=$(VERSION)
 

@@ -1,4 +1,4 @@
-// Command agentkeeper is a cross-agent watchdog that resumes Claude Code / Codex
+// Command sleeperagent is a cross-agent watchdog that resumes Claude Code / Codex
 // sessions when their usage limits reset. It launches an agent inside a managed
 // tmux session, detects the limit, waits for the reset, and injects a resume
 // prompt — and gets out of the way the moment a human takes over.
@@ -19,17 +19,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
-	"github.com/amanjaiman/agentkeeper/internal/config"
-	"github.com/amanjaiman/agentkeeper/internal/hotkeys"
-	"github.com/amanjaiman/agentkeeper/internal/notify"
-	"github.com/amanjaiman/agentkeeper/internal/ollama"
-	"github.com/amanjaiman/agentkeeper/internal/parser"
-	"github.com/amanjaiman/agentkeeper/internal/prompt"
-	"github.com/amanjaiman/agentkeeper/internal/ptybackend"
-	"github.com/amanjaiman/agentkeeper/internal/statefile"
-	"github.com/amanjaiman/agentkeeper/internal/supervisor"
-	"github.com/amanjaiman/agentkeeper/internal/tmux"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/config"
+	"github.com/amanjaiman/sleeperagent/internal/hotkeys"
+	"github.com/amanjaiman/sleeperagent/internal/notify"
+	"github.com/amanjaiman/sleeperagent/internal/ollama"
+	"github.com/amanjaiman/sleeperagent/internal/parser"
+	"github.com/amanjaiman/sleeperagent/internal/prompt"
+	"github.com/amanjaiman/sleeperagent/internal/ptybackend"
+	"github.com/amanjaiman/sleeperagent/internal/statefile"
+	"github.com/amanjaiman/sleeperagent/internal/supervisor"
+	"github.com/amanjaiman/sleeperagent/internal/tmux"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -64,7 +64,7 @@ func main() {
 	case "rm":
 		err = rmCmd(os.Args[2:])
 	case "version", "--version", "-v":
-		fmt.Printf("agentkeeper %s\n", version)
+		fmt.Printf("sleeperagent %s\n", version)
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -78,24 +78,24 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `agentkeeper — resume coding agents when usage limits reset
+	fmt.Fprint(os.Stderr, `sleeperagent — resume coding agents when usage limits reset
 
 Usage:
-  agentkeeper run             [flags] [-- launch-command...]  launch + watch an agent
-  agentkeeper attach-existing --target T [flags]              watch an already-running tmux session
-  agentkeeper agents          [--config PATH]                 list configured adapters
-  agentkeeper parse           --agent A "limit text..."       test a limit string against patterns
-  agentkeeper install         [--dir DIR] [--force]           copy this binary to a PATH directory
-  agentkeeper status          [--name NAME]                   report state / countdown
-  agentkeeper logs            --name NAME [--follow]          print / tail the instance log
-  agentkeeper detach          --name NAME                     stop watching, keep session
-  agentkeeper stop            --name NAME [--kill]             stop watching (optionally kill)
-  agentkeeper rm              --name NAME [--force] | --all    remove a stale/ended instance record
-  agentkeeper version                                         print version
+  sleeperagent run             [flags] [-- launch-command...]  launch + watch an agent
+  sleeperagent attach-existing --target T [flags]              watch an already-running tmux session
+  sleeperagent agents          [--config PATH]                 list configured adapters
+  sleeperagent parse           --agent A "limit text..."       test a limit string against patterns
+  sleeperagent install         [--dir DIR] [--force]           copy this binary to a PATH directory
+  sleeperagent status          [--name NAME]                   report state / countdown
+  sleeperagent logs            --name NAME [--follow]          print / tail the instance log
+  sleeperagent detach          --name NAME                     stop watching, keep session
+  sleeperagent stop            --name NAME [--kill]             stop watching (optionally kill)
+  sleeperagent rm              --name NAME [--force] | --all    remove a stale/ended instance record
+  sleeperagent version                                         print version
 
 Run flags:
   --agent    string  agent adapter to use (default "claude")
-  --name     string  instance / tmux session name (default "agentkeeper-<agent>")
+  --name     string  instance / tmux session name (default "sleeperagent-<agent>")
   --prompt   string  static resume prompt to inject on reset
   --reprompt string  local-LLM reprompt, e.g. "ollama:llama3.1" (falls back to static)
   --backend  string  session backend: "tmux" (default) or "pty" (no-tmux fallback)
@@ -115,12 +115,12 @@ default command (the "claude" adapter runs "claude"). Pass it only to launch
 something different — your own flags, a wrapper, or another binary.
 
 Examples:
-  agentkeeper run --agent claude --name feature-x
-  agentkeeper run --agent codex --prompt "Continue; run the tests."
-  agentkeeper run --agent claude -- claude --model opus   # custom launch command
-  agentkeeper attach-existing --agent claude --target mywork:0.1
-  agentkeeper parse --agent claude "5-hour limit reached ∙ resets 2pm"
-  agentkeeper status
+  sleeperagent run --agent claude --name feature-x
+  sleeperagent run --agent codex --prompt "Continue; run the tests."
+  sleeperagent run --agent claude -- claude --model opus   # custom launch command
+  sleeperagent attach-existing --agent claude --target mywork:0.1
+  sleeperagent parse --agent claude "5-hour limit reached ∙ resets 2pm"
+  sleeperagent status
 `)
 }
 
@@ -169,7 +169,7 @@ func runCmd(args []string) error {
 
 	instance := *name
 	if instance == "" {
-		instance = "agentkeeper-" + *agent
+		instance = "sleeperagent-" + *agent
 	}
 
 	// Background mode: re-exec ourselves detached from the terminal and return.
@@ -215,7 +215,7 @@ func runCmd(args []string) error {
 		}
 		if tx.HasSession() {
 			return fmt.Errorf("tmux session %q already exists; resume watching it with "+
-				"`agentkeeper attach-existing --agent %s --target %s`, or pick another --name",
+				"`sleeperagent attach-existing --agent %s --target %s`, or pick another --name",
 				instance, *agent, instance)
 		}
 		pane, attachHint = tx, tx.AttachHint()
@@ -323,7 +323,7 @@ func watchSession(p watchParams) error {
 		log.Printf("reprompt: %s enabled (falls back to static prompt on any failure)", p.promptMode)
 	}
 	if p.transparentTTY {
-		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; from another shell use `agentkeeper logs --name %s -f`, `agentkeeper status`, or `agentkeeper detach/stop --name %s`", p.instance, p.instance)
+		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; from another shell use `sleeperagent logs --name %s -f`, `sleeperagent status`, or `sleeperagent detach/stop --name %s`", p.instance, p.instance)
 	} else {
 		log.Printf("%s", hotkeys.Legend)
 	}
@@ -361,7 +361,7 @@ func watchSession(p watchParams) error {
 		defer log.SetOutput(os.Stderr)
 	}
 
-	// Control-file poller: `agentkeeper detach`/`stop` from another shell drops a
+	// Control-file poller: `sleeperagent detach`/`stop` from another shell drops a
 	// command file that we pick up here and forward to the supervisor.
 	go pollControl(ctx, p.instance, cmds)
 
@@ -380,7 +380,7 @@ func watchSession(p watchParams) error {
 		OnUpdate:          writeRecord,
 		OnManualAction: func(msg string) {
 			p.notifier.Notify(notify.Event{
-				Title: "AgentKeeper [" + p.instance + "]: manual choice needed",
+				Title: "SleeperAgent [" + p.instance + "]: manual choice needed",
 				Body:  msg,
 			})
 		},
@@ -454,9 +454,9 @@ func defaultBackend() string {
 }
 
 // daemonEnv marks a re-executed background child so it does not re-daemonize.
-const daemonEnv = "AGENTKEEPER_DAEMONIZED"
+const daemonEnv = "SLEEPERAGENT_DAEMONIZED"
 
-// daemonize re-executes agentkeeper detached from the controlling terminal, with
+// daemonize re-executes sleeperagent detached from the controlling terminal, with
 // stdout/stderr redirected to a per-instance log file, and returns immediately.
 // The child runs the same `run` command with daemonEnv set. The detach mechanism
 // is platform-specific (see detach_unix.go / detach_windows.go), so this works on
@@ -492,10 +492,10 @@ func daemonize(instance string, runArgs []string) error {
 	// overwrites it with full detail once it starts watching.
 	_ = statefile.Write(statefile.Record{Name: instance, State: "RUNNING", PID: pid})
 
-	fmt.Printf("agentkeeper: %q started in background (pid %d)\n", instance, pid)
-	fmt.Printf("  logs:   agentkeeper logs --name %s --follow   (file: %s)\n", instance, logPath)
-	fmt.Printf("  status: agentkeeper status --name %s\n", instance)
-	fmt.Printf("  stop:   agentkeeper detach --name %s   (or: stop --name %s --kill)\n", instance, instance)
+	fmt.Printf("sleeperagent: %q started in background (pid %d)\n", instance, pid)
+	fmt.Printf("  logs:   sleeperagent logs --name %s --follow   (file: %s)\n", instance, logPath)
+	fmt.Printf("  status: sleeperagent status --name %s\n", instance)
+	fmt.Printf("  stop:   sleeperagent detach --name %s   (or: stop --name %s --kill)\n", instance, instance)
 	return nil
 }
 
@@ -602,7 +602,7 @@ func notifyTransition(n notify.Notifier, prev string, snap supervisor.Snapshot, 
 	if cur == prev {
 		return
 	}
-	tag := "AgentKeeper [" + instance + "]"
+	tag := "SleeperAgent [" + instance + "]"
 	switch cur {
 	case "WAITING":
 		body := "waiting until reset"
@@ -697,7 +697,7 @@ func parseCmd(args []string) error {
 	}
 	text := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if text == "" {
-		return fmt.Errorf("provide the limit text to test, e.g. agentkeeper parse --agent claude \"...resets 2pm\"")
+		return fmt.Errorf("provide the limit text to test, e.g. sleeperagent parse --agent claude \"...resets 2pm\"")
 	}
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
@@ -710,7 +710,7 @@ func parseCmd(args []string) error {
 
 	match, groups, ok := parser.Detect(ad.LimitPatterns, text)
 	if !ok {
-		fmt.Printf("no limit pattern matched for agent %q.\nrun `agentkeeper agents` to see the patterns.\n", *agent)
+		fmt.Printf("no limit pattern matched for agent %q.\nrun `sleeperagent agents` to see the patterns.\n", *agent)
 		return fmt.Errorf("no match")
 	}
 	fmt.Printf("matched: %s\n", match)
@@ -752,7 +752,7 @@ func statusCmd(args []string) error {
 		}
 	}
 	if len(recs) == 0 {
-		fmt.Println("no AgentKeeper instances found")
+		fmt.Println("no SleeperAgent instances found")
 		return nil
 	}
 
@@ -884,7 +884,7 @@ func rmCmd(args []string) error {
 		return fmt.Errorf("no such instance %q", *name)
 	}
 	if processAlive(rec.PID) && !*force {
-		return fmt.Errorf("%q still has a running supervisor (pid %d); stop it with `agentkeeper stop --name %s --kill` first, or pass --force", *name, rec.PID, *name)
+		return fmt.Errorf("%q still has a running supervisor (pid %d); stop it with `sleeperagent stop --name %s --kill` first, or pass --force", *name, rec.PID, *name)
 	}
 	statefile.Remove(*name)
 	fmt.Printf("removed record for %q\n", *name)

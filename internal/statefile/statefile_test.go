@@ -6,7 +6,7 @@ import (
 )
 
 func TestWriteReadRoundTrip(t *testing.T) {
-	t.Setenv("AGENTKEEPER_STATE_DIR", t.TempDir())
+	t.Setenv("SLEEPERAGENT_STATE_DIR", t.TempDir())
 
 	in := Record{
 		Name:       "feature-x",
@@ -37,7 +37,7 @@ func TestWriteReadRoundTrip(t *testing.T) {
 }
 
 func TestListAndRemove(t *testing.T) {
-	t.Setenv("AGENTKEEPER_STATE_DIR", t.TempDir())
+	t.Setenv("SLEEPERAGENT_STATE_DIR", t.TempDir())
 	for _, n := range []string{"b", "a"} {
 		if err := Write(Record{Name: n, Agent: "claude", State: "RUNNING"}); err != nil {
 			t.Fatal(err)
@@ -58,7 +58,7 @@ func TestListAndRemove(t *testing.T) {
 }
 
 func TestControlRoundTrip(t *testing.T) {
-	t.Setenv("AGENTKEEPER_STATE_DIR", t.TempDir())
+	t.Setenv("SLEEPERAGENT_STATE_DIR", t.TempDir())
 
 	if _, ok, _ := TakeControl("x"); ok {
 		t.Fatal("expected no pending control command")

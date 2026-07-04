@@ -4,12 +4,12 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+BIN="$ROOT/sleeperagent-linux"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 N="ak-auto-$$"
 fail=0
 
-cleanup() { tmux kill-session -t "$N" 2>/dev/null; rm -rf "$AGENTKEEPER_STATE_DIR"; }
+cleanup() { tmux kill-session -t "$N" 2>/dev/null; rm -rf "$SLEEPERAGENT_STATE_DIR"; }
 trap cleanup EXIT
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; fail=1; fi; }
 

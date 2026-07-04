@@ -1,4 +1,4 @@
-# goreleaser config for AgentKeeper. Tag a release (e.g. `git tag v0.1.0 && git
+# goreleaser config for SleeperAgent. Tag a release (e.g. `git tag v0.1.0 && git
 # push --tags`) and the release workflow builds these artifacts.
 version: 2
 
@@ -7,9 +7,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: agentkeeper
-    main: ./cmd/agentkeeper
-    binary: agentkeeper
+  - id: sleeperagent
+    main: ./cmd/sleeperagent
+    binary: sleeperagent
     env:
       - CGO_ENABLED=0
     ldflags:

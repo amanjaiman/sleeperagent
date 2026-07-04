@@ -5,13 +5,13 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+BIN="$ROOT/sleeperagent-linux"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 N="ak-daemon-$$"
 CFG="$(mktemp --suffix=.toml)"
 fail=0
 
-cleanup() { tmux kill-session -t "$N" 2>/dev/null; rm -rf "$CFG" "$AGENTKEEPER_STATE_DIR"; }
+cleanup() { tmux kill-session -t "$N" 2>/dev/null; rm -rf "$CFG" "$SLEEPERAGENT_STATE_DIR"; }
 trap cleanup EXIT
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; fail=1; fi; }
 
@@ -32,8 +32,8 @@ check "parent printed 'started in background'" 'echo "$out" | grep -q "started i
 sleep 3
 check "tmux session was created by the child" 'tmux has-session -t "$N" 2>/dev/null'
 check "status shows the daemon RUNNING" '"$BIN" status --name "$N" | grep -q RUNNING'
-check "log file was written" '[ -s "$AGENTKEEPER_STATE_DIR/$N.log" ]'
-DPID="$("$BIN" status --name "$N" >/dev/null 2>&1; cat "$AGENTKEEPER_STATE_DIR/$N.json" | grep -o "\"pid\": *[0-9]*" | grep -o "[0-9]*")"
+check "log file was written" '[ -s "$SLEEPERAGENT_STATE_DIR/$N.log" ]'
+DPID="$("$BIN" status --name "$N" >/dev/null 2>&1; cat "$SLEEPERAGENT_STATE_DIR/$N.json" | grep -o "\"pid\": *[0-9]*" | grep -o "[0-9]*")"
 check "daemon process is alive" 'kill -0 "$DPID" 2>/dev/null'
 
 echo "== detach from another shell =="
@@ -42,6 +42,6 @@ sleep 3
 check "daemon process exited after detach" '! kill -0 "$DPID" 2>/dev/null'
 check "tmux session still alive (detach kept it)" 'tmux has-session -t "$N" 2>/dev/null'
 
-echo "---- daemon log ----"; cat "$AGENTKEEPER_STATE_DIR/$N.log"
+echo "---- daemon log ----"; cat "$SLEEPERAGENT_STATE_DIR/$N.log"
 if [ "$fail" -eq 0 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL"; fi
 exit "$fail"

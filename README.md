@@ -1,14 +1,14 @@
-# AgentKeeper
+# SleeperAgent
 
-[![CI](https://github.com/amanjaiman/agentkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/agentkeeper/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/amanjaiman/agentkeeper)](https://github.com/amanjaiman/agentkeeper/releases)
-[![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/agentkeeper.svg)](https://pkg.go.dev/github.com/amanjaiman/agentkeeper)
-[![Go Report Card](https://goreportcard.com/badge/github.com/amanjaiman/agentkeeper)](https://goreportcard.com/report/github.com/amanjaiman/agentkeeper)
+[![CI](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/amanjaiman/sleeperagent)](https://github.com/amanjaiman/sleeperagent/releases)
+[![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg)](https://pkg.go.dev/github.com/amanjaiman/sleeperagent)
+[![Go Report Card](https://goreportcard.com/badge/github.com/amanjaiman/sleeperagent)](https://goreportcard.com/report/github.com/amanjaiman/sleeperagent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **A cross-agent watchdog that resumes Claude Code / Codex sessions when their usage limits reset — and gets out of your way the moment you want to take over.**
 
-When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. AgentKeeper runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
+When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. SleeperAgent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
 
 ```text
 12:58:03 watching. take over any time with: tmux attach -t feature-x
@@ -31,12 +31,12 @@ See [docs/SPEC.md](docs/SPEC.md) for the full design rationale.
 
 ## Install
 
-**Prebuilt binary** — download for your OS/arch from the [Releases](https://github.com/amanjaiman/agentkeeper/releases) page.
+**Prebuilt binary** — download for your OS/arch from the [Releases](https://github.com/amanjaiman/sleeperagent/releases) page.
 
 Put it on your `PATH`:
 
 ```bash
-./agentkeeper install
+./sleeperagent install
 ```
 
 If the install directory is not already on `PATH`, the command prints the exact `setx PATH` or `export PATH` line to run, plus a reminder to open a new shell.
@@ -44,20 +44,20 @@ If the install directory is not already on `PATH`, the command prints the exact 
 **With the Go toolchain:**
 
 ```bash
-go install github.com/amanjaiman/agentkeeper/cmd/agentkeeper@latest
+go install github.com/amanjaiman/sleeperagent/cmd/sleeperagent@latest
 ```
 
 **From source** (requires Go 1.23+):
 
 ```bash
-git clone https://github.com/amanjaiman/agentkeeper && cd agentkeeper
-make build      # -> ./agentkeeper (version stamped from git)
+git clone https://github.com/amanjaiman/sleeperagent && cd sleeperagent
+make build      # -> ./sleeperagent (version stamped from git)
 make check      # gofmt + go vet + unit tests
 ```
 
 ### Platform support
 
-AgentKeeper needs a "session backend" — something it can run the agent inside, read output from, and type into.
+SleeperAgent needs a "session backend" — something it can run the agent inside, read output from, and type into.
 
 | OS | Default backend | Setup | Handoff |
 |---|---|---|---|
@@ -73,10 +73,10 @@ Optional extras: a local [Ollama](https://ollama.com) for `--reprompt`; `notify-
 
 ```bash
 # Launch claude, watch it, and auto-resume when the limit resets
-agentkeeper run --agent claude --name mytask
+sleeperagent run --agent claude --name mytask
 ```
 
-`--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Press `d` to detach, or just leave it running. Run `agentkeeper` with no arguments for the built-in help.
+`--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Press `d` to detach, or just leave it running. Run `sleeperagent` with no arguments for the built-in help.
 
 ---
 
@@ -101,7 +101,7 @@ agentkeeper run --agent claude --name mytask
 | Flag | Description |
 |---|---|
 | `--agent` | Adapter to use: `claude` (default) or `codex`. |
-| `--name` | Instance / tmux session name (default `agentkeeper-<agent>`). |
+| `--name` | Instance / tmux session name (default `sleeperagent-<agent>`). |
 | `--prompt` | Static resume prompt to inject on reset. |
 | `--reprompt` | Local-LLM reprompt, e.g. `ollama:llama3.1` (falls back to static). |
 | `--backend` | `tmux` (default on Unix) or `pty` (default on Windows). |
@@ -118,43 +118,43 @@ agentkeeper run --agent claude --name mytask
 
 ```bash
 # Codex with a custom static resume prompt
-agentkeeper run --agent codex --prompt "Continue; run the tests after."
+sleeperagent run --agent codex --prompt "Continue; run the tests after."
 
 # Let a local model write the continuation instruction each reset
-agentkeeper run --agent claude --reprompt ollama:llama3.1
+sleeperagent run --agent claude --reprompt ollama:llama3.1
 
 # Run in the background and check on it later (works on all platforms)
-agentkeeper run --agent claude --name nightly --daemon
-agentkeeper status
+sleeperagent run --agent claude --name nightly --daemon
+sleeperagent status
 
 # Just nudge me at the reset — don't auto-resume
-agentkeeper run --agent claude --watch-only
+sleeperagent run --agent claude --watch-only
 
 # Custom launch command — same Claude adapter, but your own flags / wrapper / binary
-agentkeeper run --agent claude -- claude --model opus --add-dir ../shared-lib
+sleeperagent run --agent claude -- claude --model opus --add-dir ../shared-lib
 
 # Watch an agent you started yourself in tmux
-agentkeeper attach-existing --agent claude --target mywork:0.1
+sleeperagent attach-existing --agent claude --target mywork:0.1
 
 # Same, but for a Codex session running in another tmux pane
-agentkeeper attach-existing --agent codex --target mywork:0.2
+sleeperagent attach-existing --agent codex --target mywork:0.2
 
 # Validate a limit pattern against text you copied from your real CLI
-agentkeeper parse --agent claude "5-hour limit reached ∙ resets 2pm"
+sleeperagent parse --agent claude "5-hour limit reached ∙ resets 2pm"
 ```
 
 ---
 
 ## Taking over
 
-AgentKeeper is built to get out of your way. How handoff works depends on the backend:
+SleeperAgent is built to get out of your way. How handoff works depends on the backend:
 
 **tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over.
 
 - **Hotkeys** (foreground run): `d`/`q` detach, `k` kills the session (with a `y` confirm).
-- **`agentkeeper detach --name X`** from any other shell.
+- **`sleeperagent detach --name X`** from any other shell.
 - **Ctrl-C** detaches — it never kills the session.
-- **Auto-detach:** the moment you `tmux attach`, AgentKeeper notices and steps aside so you don't both type (disable with `--no-auto-detach`).
+- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type (disable with `--no-auto-detach`).
 - Reattach anytime with `tmux attach -t <name>`.
 
 **pty / ConPTY backend (default on Windows, optional on Unix):** the agent is a child of the supervisor, so it **can't be handed back interactively**. In the foreground, `detach` gives the terminal back to you until the agent exits; in `--daemon` mode, `detach`/`stop` ends the agent. Use the tmux backend if you need full handoff.
@@ -167,11 +167,11 @@ Built-in defaults already cover Claude Code and Codex. To override timings or th
 
 | OS | Config file | State / logs |
 |---|---|---|
-| Linux | `~/.config/agentkeeper/config.toml` | `~/.local/state/agentkeeper/` |
-| macOS | `~/Library/Application Support/agentkeeper/config.toml` | `~/.local/state/agentkeeper/` |
-| Windows | `%AppData%\agentkeeper\config.toml` | `%AppData%\agentkeeper\state\` |
+| Linux | `~/.config/sleeperagent/config.toml` | `~/.local/state/sleeperagent/` |
+| macOS | `~/Library/Application Support/sleeperagent/config.toml` | `~/.local/state/sleeperagent/` |
+| Windows | `%AppData%\sleeperagent\config.toml` | `%AppData%\sleeperagent\state\` |
 
-`agentkeeper status` reads the per-instance state file, so it works from any shell; a `*` next to a state means the supervisor process is no longer running.
+`sleeperagent status` reads the per-instance state file, so it works from any shell; a `*` next to a state means the supervisor process is no longer running.
 
 **Limit patterns** are Go regexes with a named group for the reset time, resolved most-reliable-first:
 
@@ -179,13 +179,13 @@ Built-in defaults already cover Claude Code and Codex. To override timings or th
 - `(?P<time>…)` — a clock time (`2pm`, `6:34 AM`)
 - `(?P<dur>…)` — a relative duration (`in 2h30m`, `in 45 minutes`)
 
-If none parse, AgentKeeper assumes a 5-hour window and flags it low-confidence. Use `agentkeeper parse` to check a pattern against real output, and `agentkeeper agents` to validate your config. Adding a new agent is usually just a new `[agents.<name>]` block — no code.
+If none parse, SleeperAgent assumes a 5-hour window and flags it low-confidence. Use `sleeperagent parse` to check a pattern against real output, and `sleeperagent agents` to validate your config. Adding a new agent is usually just a new `[agents.<name>]` block — no code.
 
 ---
 
 ## Local-LLM reprompt *(optional)*
 
-By default AgentKeeper injects a fixed string on reset. With `--reprompt ollama:<model>` it instead asks a **local** model to write the next instruction: it reads the tail of the agent's transcript plus `git diff --stat` / `git log` in the agent's cwd, sends a fixed meta-prompt to Ollama, and **validates** the reply (non-empty, under `max_prompt_chars`, clears the denylist) before injecting.
+By default SleeperAgent injects a fixed string on reset. With `--reprompt ollama:<model>` it instead asks a **local** model to write the next instruction: it reads the tail of the agent's transcript plus `git diff --stat` / `git log` in the agent's cwd, sends a fixed meta-prompt to Ollama, and **validates** the reply (non-empty, under `max_prompt_chars`, clears the denylist) before injecting.
 
 It's purely additive and safe-by-construction: if Ollama is unreachable, the output is empty/over-long/denylisted, or there's no context, it **falls back to the static prompt** so the session still resumes. Everything stays local — no transcript leaves your machine. Tune it under `[reprompt]` in the config (`model`, `base_url`, `max_prompt_chars`, `tail_messages`, `denylist`); `base_url` also honors `$OLLAMA_HOST`.
 
@@ -197,9 +197,9 @@ Desktop notifications are on by default (best effort; `--no-notify` to disable) 
 
 ## Safety
 
-AgentKeeper **waits for legitimate resets**; it does not bypass limits.
+SleeperAgent **waits for legitimate resets**; it does not bypass limits.
 
-Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — AgentKeeper does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. `--auto-answer-prompts` is a separate loud opt-in that leaves prompts enabled but answers detected interactive prompts with their first/default option, which may approve tool calls. Prefer to stay in the loop? `--watch-only` notifies you at the reset and lets you resume by hand. LLM-generated prompts are length-capped and denylist-checked before injection.
+Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. `--auto-answer-prompts` is a separate loud opt-in that leaves prompts enabled but answers detected interactive prompts with their first/default option, which may approve tool calls. Prefer to stay in the loop? `--watch-only` notifies you at the reset and lets you resume by hand. LLM-generated prompts are length-capped and denylist-checked before injection.
 
 ## How it works
 
@@ -214,7 +214,7 @@ RUNNING --limit detected--> LIMITED --reset parsed--> WAITING
 
 ## Contributing
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Adding an agent is usually just a config block; reporting a limit-string that stopped matching helps keep the built-in defaults current. The codebase is a small set of `internal/` packages behind the CLI in `cmd/agentkeeper`; run `make check` before a PR.
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Adding an agent is usually just a config block; reporting a limit-string that stopped matching helps keep the built-in defaults current. The codebase is a small set of `internal/` packages behind the CLI in `cmd/sleeperagent`; run `make check` before a PR.
 
 ## License
 

@@ -3,12 +3,12 @@
 # session it is watching goes away. Two cases:
 #   1) the tmux session is killed out from under the supervisor;
 #   2) the agent process exits on its own.
-# In both cases `agentkeeper run` must return within a couple of poll intervals
+# In both cases `sleeperagent run` must return within a couple of poll intervals
 # instead of looping forever on "capture failed".
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 CFG="$(mktemp --suffix=.toml)"
 
 cleanup() {

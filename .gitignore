@@ -1,8 +1,8 @@
 # Build artifacts
-/agentkeeper
-/agentkeeper.exe
-/agentkeeper-linux
-/agentkeeper-*
+/sleeperagent
+/sleeperagent.exe
+/sleeperagent-linux
+/sleeperagent-*
 *.test
 /dist/
 

@@ -1,7 +1,7 @@
 // Package hotkeys provides the supervisor's foreground key controls: d/q to
 // detach (keep the session), k to kill it (with confirmation). It reads single
 // keypresses in raw mode and is a no-op when stdin is not a terminal, so a
-// backgrounded `agentkeeper run` is unaffected.
+// backgrounded `sleeperagent run` is unaffected.
 package hotkeys
 
 import (
@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/amanjaiman/agentkeeper/internal/supervisor"
+	"github.com/amanjaiman/sleeperagent/internal/supervisor"
 )
 
 // Legend is the one-line hint printed alongside the status output.

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
-	"github.com/amanjaiman/agentkeeper/internal/parser"
-	"github.com/amanjaiman/agentkeeper/internal/prompt"
-	"github.com/amanjaiman/agentkeeper/internal/state"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/parser"
+	"github.com/amanjaiman/sleeperagent/internal/prompt"
+	"github.com/amanjaiman/sleeperagent/internal/state"
 )
 
 // Pane is the session backend the supervisor observes and writes to. tmux.Client
@@ -44,7 +44,7 @@ const (
 )
 
 // Snapshot is the supervisor's observable state, handed to Options.OnUpdate so
-// the caller can persist it for `agentkeeper status`.
+// the caller can persist it for `sleeperagent status`.
 type Snapshot struct {
 	State     state.State
 	Reset     parser.ResetInfo
@@ -618,7 +618,7 @@ func (s *Supervisor) onResuming(capture string, now time.Time) error {
 }
 
 // resumeConfirmed clears the per-limit-event scratch and returns to RUNNING.
-// Crucially it also clears the resolved reset/wait times so `agentkeeper status`
+// Crucially it also clears the resolved reset/wait times so `sleeperagent status`
 // no longer shows a stale WAITING countdown once the agent is working again.
 func (s *Supervisor) resumeConfirmed() {
 	s.handledMatch = s.currentMatch
