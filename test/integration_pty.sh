@@ -74,6 +74,7 @@ for _ in $(seq 1 30); do
 done
 kill "$SUP" 2>/dev/null; wait "$SUP" 2>/dev/null
 
+echo "== supervisor log =="; cat /tmp/ak_pty.log 2>/dev/null
 echo "== marker (what the agent received) =="; cat "$MARKER" 2>/dev/null
 echo "== webhook titles =="; cat "$HOOKLOG" 2>/dev/null
 
