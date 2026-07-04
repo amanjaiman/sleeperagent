@@ -103,7 +103,6 @@ Run flags:
   --config   string  path to config.toml (default: OS config dir)
   --daemon           run in the background; control via status/detach/stop
                      (tmux backend keeps full handoff; pty backend ends on detach)
-  --watch-only       notify at reset but do NOT auto-inject
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
   --auto-answer-prompts
                      answer interactive prompts with the first/default option (DANGEROUS)
@@ -135,7 +134,6 @@ func runCmd(args []string) error {
 	backend := fs.String("backend", defaultBackend(), `session backend: "tmux" or "pty"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
-	watchOnly := fs.Bool("watch-only", false, "notify at reset but do NOT auto-inject")
 	yolo := fs.Bool("yolo", false, "append the agent's skip-permissions flag (DANGEROUS)")
 	autoAnswerPrompts := fs.Bool("auto-answer-prompts", false, "answer interactive prompts with the first/default option (DANGEROUS)")
 	daemon := fs.Bool("daemon", false, "run in the background; control via status/detach/stop")
@@ -269,7 +267,6 @@ func runCmd(args []string) error {
 		cfg:               cfg,
 		cwd:               cwd,
 		autoDetach:        !*noAutoDetach,
-		watchOnly:         *watchOnly,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 		transparentTTY:    *backend == "pty",
@@ -293,7 +290,6 @@ type watchParams struct {
 	cfg               config.Config
 	cwd               string
 	autoDetach        bool
-	watchOnly         bool
 	autoAnswerPrompts bool
 	notifier          notify.Notifier
 	transparentTTY    bool
@@ -313,9 +309,6 @@ func watchSession(p watchParams) error {
 		go p.foreground(ctx)
 	}
 	log.Printf("watching. take over any time with: %s", p.attachHint)
-	if p.watchOnly {
-		log.Printf("watch-only: will notify at reset but NOT auto-inject")
-	}
 	if p.autoAnswerPrompts {
 		log.Printf("auto-answer-prompts: enabled; interactive prompts may be accepted without a human")
 	}
@@ -374,7 +367,6 @@ func watchSession(p watchParams) error {
 		MaxWait:           p.cfg.MaxWait.D(),
 		Cwd:               p.cwd,
 		AutoDetach:        p.autoDetach,
-		WatchOnly:         p.watchOnly,
 		AutoAnswerPrompts: p.autoAnswerPrompts,
 		Commands:          cmds,
 		OnUpdate:          writeRecord,
@@ -530,7 +522,6 @@ func attachExistingCmd(args []string) error {
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
-	watchOnly := fs.Bool("watch-only", false, "notify at reset but do NOT auto-inject")
 	autoAnswerPrompts := fs.Bool("auto-answer-prompts", false, "answer interactive prompts with the first/default option (DANGEROUS)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -590,7 +581,6 @@ func attachExistingCmd(args []string) error {
 		cfg:               cfg,
 		cwd:               cwd,
 		autoDetach:        !*noAutoDetach,
-		watchOnly:         *watchOnly,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 	})

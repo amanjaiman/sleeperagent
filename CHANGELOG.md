@@ -20,8 +20,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Polish (M5)** — `--backend pty` no-tmux fallback (Unix), desktop + `--webhook`
   notifications, progressive re-limit backoff.
 - **Operability** — `attach-existing` (watch/recover a running session),
-  `--watch-only` (notify but don't inject), `--yolo` (explicit unattended opt-in),
-  `parse` (test limit strings against patterns), and a `version` command.
+  `--yolo` (explicit unattended opt-in), `parse` (test limit strings against
+  patterns), and a `version` command.
 - **Background mode** — `run --daemon` re-executes detached from the terminal, logs
   to `<state-dir>/<name>.log`, and is controlled entirely via `status` / `detach` /
   `stop`. Works with both backends: the tmux backend keeps full handoff; the pty

@@ -116,9 +116,6 @@ type Options struct {
 	// AutoDetach, when true, detaches automatically if a human attaches to the
 	// session while the supervisor is observing or waiting.
 	AutoDetach bool
-	// WatchOnly, when true, notifies at reset but never injects: on reaching the
-	// reset it logs and detaches, leaving the resume to the human.
-	WatchOnly bool
 	// AutoAnswerPrompts, when true, answers generic interactive agent prompts
 	// with their first/default option. Dangerous: may approve tool calls.
 	AutoAnswerPrompts bool
@@ -523,11 +520,6 @@ func firstPromptKeys(promptText string) string {
 
 func (s *Supervisor) onWaiting(now time.Time) {
 	if !now.Before(s.waitUntil) {
-		if s.opt.WatchOnly {
-			s.opt.Logf("reset reached (watch-only): not injecting — take over with: %s", s.opt.Tmux.AttachHint())
-			s.st = state.Detached
-			return
-		}
 		s.opt.Logf("reset reached; resuming")
 		s.injected = false
 		s.injectAttempts = 0

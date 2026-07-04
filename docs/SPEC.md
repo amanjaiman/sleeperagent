@@ -265,4 +265,3 @@ denylist         = ["rm -rf", "force push", "--force", "drop table"]
 - Foreground status view vs. background daemon + `status` polling as the default run mode?
 - For LLM reprompt, is transcript-tail enough context, or worth summarizing the whole session into a rolling "task memory" file?
 - Should auto-detach-on-user-activity be default-on or opt-in?
-- Worth a `--watch-only` mode that just notifies you at reset (no auto-inject) for users who want a nudge, not automation?

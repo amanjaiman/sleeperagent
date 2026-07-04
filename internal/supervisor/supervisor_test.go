@@ -423,32 +423,6 @@ func TestReLimitBackoff(t *testing.T) {
 	}
 }
 
-// TestWatchOnlyDetachesAtResetWithoutInjecting verifies watch-only mode: it
-// reaches the reset, then detaches instead of injecting.
-func TestWatchOnlyDetachesAtResetWithoutInjecting(t *testing.T) {
-	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
-	pane := &fakePane{screen: "working\n"}
-	sup := New(Options{
-		Adapter: testAdapter(t), Tmux: pane, Prompt: prompt.NewStatic("continue"),
-		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
-		Now: clk.now, WatchOnly: true,
-	})
-
-	must(t, sup.tick()) // running
-	pane.screen = "5-hour limit reached ∙ resets 11am\n"
-	must(t, sup.tick()) // LIMITED
-	must(t, sup.tick()) // WAITING
-	clk.add(2 * time.Hour)
-	must(t, sup.tick()) // reset reached -> watch-only -> DETACHED
-
-	if sup.State() != state.Detached {
-		t.Fatalf("state = %s, want DETACHED in watch-only at reset", sup.State())
-	}
-	if len(pane.injected) != 0 {
-		t.Fatalf("watch-only must not inject, got %v", pane.injected)
-	}
-}
-
 func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
 	menu := readParserTestdata(t, "claude", "rate-limit-menu.txt")
 	pane := &fakePane{screen: "Claude usage limit reached. Your limit will reset at 11am.\n" + menu}
