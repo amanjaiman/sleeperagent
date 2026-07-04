@@ -23,7 +23,7 @@
   /></a>
 </p>
 
-<h3 align="center">Your usage limit resets. Your agent keeps going.</h3>
+<h3 align="center">Your usage limit resets. Your agent automatically continues.</h3>
 
 When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. SleeperAgent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
 
