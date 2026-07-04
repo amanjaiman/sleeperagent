@@ -18,7 +18,11 @@ SUP=$!
 sleep 3
 
 echo "== simulate a human attaching (tmux attach in a pty) =="
-script -qfc "tmux attach -t $N" /dev/null >/tmp/ak_auto_script.log 2>&1 &
+# CI shells often run with no usable TERM (or one terminfo lacks, e.g. "dumb"),
+# which makes tmux refuse the attach ("open terminal failed: terminal does not
+# support clear") before it ever registers a client. Force a terminfo tmux/most
+# systems ship so the simulated attach actually takes.
+TERM=xterm script -qfc "tmux attach -t $N" /dev/null >/tmp/ak_auto_script.log 2>&1 &
 ATT=$!
 
 # Wait for tmux to actually register the attached client before asserting
