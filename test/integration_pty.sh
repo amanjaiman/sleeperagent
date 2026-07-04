@@ -16,7 +16,8 @@ export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
 cleanup() {
   [ -n "${HOOK_PID:-}" ] && kill "$HOOK_PID" 2>/dev/null
   [ -n "${SUP:-}" ] && kill "$SUP" 2>/dev/null
-  rm -rf "$MARKER" "$HOOKLOG" "$CFG" "$AGENT" "$AGENTKEEPER_STATE_DIR"
+  exec 9<&- 2>/dev/null
+  rm -rf "$MARKER" "$HOOKLOG" "$CFG" "$AGENT" "$AGENTKEEPER_STATE_DIR" "$STDIN_FIFO"
 }
 trap cleanup EXIT
 
@@ -59,7 +60,17 @@ chmod +x "$AGENT"
 echo "== launching with --backend pty --webhook =="
 # Drive a pty for the supervisor's own stdin via script, so it has a controlling
 # tty; force TERM in case the CI shell's is one raw-mode setup doesn't like.
-TERM=xterm script -qfc "$BIN run --agent fake --name ak-pty-$$ --backend pty --no-notify --config $CFG --webhook http://127.0.0.1:$PORT --prompt pty-continue -- $AGENT" /tmp/ak_pty.log >/dev/null 2>&1 &
+#
+# script relays its OWN stdin into the pty. In an interactive shell that stdin
+# just sits idle, but under CI (a genuinely non-interactive step backgrounded
+# with `&`) it's closed/`/dev/null` and reads as immediate EOF -- which made
+# `script` (and the wrapped agentkeeper process with it) exit within ~1-2s,
+# long before the limit/wait/resume cycle could run. Give it a fifo opened
+# read-write so the read end never sees EOF, even though nothing is written.
+STDIN_FIFO="$(mktemp -u)"
+mkfifo "$STDIN_FIFO"
+exec 9<>"$STDIN_FIFO"
+TERM=xterm script -qfc "$BIN run --agent fake --name ak-pty-$$ --backend pty --no-notify --config $CFG --webhook http://127.0.0.1:$PORT --prompt pty-continue -- $AGENT" /tmp/ak_pty.log <&9 >/dev/null 2>&1 &
 SUP=$!
 
 # Poll for the full limit -> wait -> resume -> notify cycle to complete instead
