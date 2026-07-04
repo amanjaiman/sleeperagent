@@ -117,21 +117,28 @@ long unattended run Claude may surface *other* interactive prompts (tool-use
 permission, a clarifying choice, a yes/no confirmation). Today those block
 forever — the agent parks at the prompt and the run stalls until a human returns.
 
-### Design — `--auto-answer-prompts` (opt-in, dangerous, like `--yolo`)
+### Design — `--auto-answer-prompts` (default on, easy opt-out)
 Add a run/attach flag that, **when the agent is waiting on an interactive
 prompt**, selects the **first / default** option automatically:
 
 ```
 --auto-answer-prompts   answer any interactive agent prompt with its first/default
-                        option (DANGEROUS, unattended — may approve tool calls)
+                        option so the run doesn't stall while you're away
+                        (default true; pass --auto-answer-prompts=false to disable)
 ```
 
 This is the *general* analogue of §G's single safe rule, so it must be:
 
-- **Off by default and loudly opt-in.** Same posture as `--yolo`
-  ([SPEC.md §7](SPEC.md), [main.go:156-162](../cmd/sleeperagent/main.go)): print a
-  warning at launch that arbitrary prompts — including ones that run tool calls —
-  will be auto-accepted.
+- **On by default, with a clear log line and an easy opt-out.** Unlike `--yolo`
+  ([SPEC.md §7](SPEC.md), [main.go](../cmd/sleeperagent/main.go)), which bypasses
+  permission prompts entirely and stays an explicit opt-in, `--auto-answer-prompts`
+  only answers prompts that are already showing — it defaults to `true` because
+  running an agent unattended already means accepting it can act without a human
+  in the loop each cycle; without this flag, an agent that hits a question while
+  the user is away just sits stuck, defeating the point of unattended auto-resume.
+  Log at launch (whenever the option is enabled, which is now the common case)
+  that prompts — including ones that run tool calls — will be auto-accepted, and
+  that `--auto-answer-prompts=false` disables it.
 - **Distinct from `--yolo`.** `--yolo` removes the prompts up front (it passes
   the agent's skip-permissions flag); `--auto-answer-prompts` leaves prompts in
   place but answers them. A user may want one, the other, or neither. (Note: with
@@ -171,12 +178,24 @@ option is destructive on some prompt, that is the user's accepted trade-off for
 enabling an unattended auto-accept; the warning text must say so.
 
 ### Acceptance criteria
-- Without the flag, behavior is unchanged: non-rate-limit prompts are left for the
-  human (the watchdog only handles the verified §G menu).
-- With `--auto-answer-prompts`, a replayed Claude permission/clarify prompt is
+- With `--auto-answer-prompts=false`, behavior is unchanged from the pre-flag
+  world: non-rate-limit prompts are left for the human (the watchdog only
+  handles the verified §G menu).
+- By default (flag on), a replayed Claude permission/clarify prompt is
   answered with its first option automatically, and the run continues; the action
   is logged.
-- The flag prints a `--yolo`-style danger warning on launch.
+- The flag logs what it's doing on launch whenever enabled (i.e. by default,
+  unless explicitly disabled).
+
+### Note — default flipped to on
+This spec originally proposed `--auto-answer-prompts` as an off-by-default,
+loudly opt-in flag, matching `--yolo`'s posture. That default was later flipped
+to **on** (see CHANGELOG `[Unreleased]`): without it, an agent that hits an
+interactive prompt while the user is away stalls indefinitely, which defeats
+the purpose of unattended auto-resume. Choosing to run an agent unattended at
+all already means accepting it can act without a human in the loop; this just
+extends that same acceptance to routine prompts instead of stalling on them.
+`--auto-answer-prompts=false` remains the way to disable it.
 - The prompt detector has positive and **negative** tests (must not fire on
   normal agent output, spinners, or the input box).
 
