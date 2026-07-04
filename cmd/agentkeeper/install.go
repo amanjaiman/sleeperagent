@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -166,9 +167,22 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return os.Chmod(dst, mode)
 }
 
+// pathContainsDir and cleanPathForCompare take an explicit goos so they can
+// evaluate a PATH string for any target OS, not just the one this binary was
+// built for. path/filepath's separator conventions are fixed at build time to
+// runtime.GOOS, so filepath.SplitList/filepath.Clean silently apply the wrong
+// rules whenever goos != the build OS (e.g. checking Windows PATH semantics
+// from a Linux/macOS test binary) — hence the hand-rolled logic below.
 func pathContainsDir(pathValue, dir, goos string) bool {
+	if pathValue == "" {
+		return false
+	}
 	want := cleanPathForCompare(dir, goos)
-	for _, entry := range filepath.SplitList(pathValue) {
+	listSep := ":"
+	if goos == "windows" {
+		listSep = ";"
+	}
+	for _, entry := range strings.Split(pathValue, listSep) {
 		if cleanPathForCompare(entry, goos) == want {
 			return true
 		}
@@ -176,12 +190,12 @@ func pathContainsDir(pathValue, dir, goos string) bool {
 	return false
 }
 
-func cleanPathForCompare(path, goos string) string {
-	cleaned := filepath.Clean(path)
+func cleanPathForCompare(p, goos string) string {
 	if goos == "windows" {
-		return strings.ToLower(cleaned)
+		cleaned := path.Clean(strings.ReplaceAll(p, `\`, "/"))
+		return strings.ToLower(strings.ReplaceAll(cleaned, "/", `\`))
 	}
-	return cleaned
+	return path.Clean(p)
 }
 
 func pathRemediation(dir, goos string) string {
