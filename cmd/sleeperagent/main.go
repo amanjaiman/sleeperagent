@@ -674,7 +674,6 @@ func agentsCmd(args []string) error {
 		}
 		fmt.Printf("%s  [%s]\n", name, status)
 		fmt.Printf("    launch : %s\n", ac.LaunchCmd)
-		fmt.Printf("    resume : %s\n", ac.ResumeCmd)
 		fmt.Printf("    inject : %s\n", injectStyleOrDefault(ac.InjectStyle))
 		for _, p := range ac.LimitPatterns {
 			fmt.Printf("    limit  : %s\n", p)

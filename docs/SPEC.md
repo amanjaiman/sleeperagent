@@ -87,7 +87,6 @@ A small interface so the core loop is agent-agnostic. Adapters are data + a few 
 | Field | Claude Code | Codex CLI |
 |---|---|---|
 | `launch_cmd` | `claude` | `codex` |
-| `resume_cmd` | `claude -c` (continue last) or re-inject into live pane | `codex resume` or live pane inject |
 | `limit_patterns` | `limit reached ∙ resets (?P<time>.+)` (TUI); `Claude AI usage limit reached\|(?P<ts>\d+)` (headless) | `try again at (?P<time>.+)`; rate-limit banner |
 | `reset_parse` | unix ts (headless) or local clock time like `2pm` (TUI) | clock time like `6:34 AM` |
 | `idle_pattern` | prompt box / `>` ready indicator, no spinner | input prompt ready |
@@ -197,7 +196,6 @@ max_wait      = "24h"
 
 [agents.claude]
 launch_cmd      = "claude"
-resume_cmd      = "claude -c"
 limit_patterns  = [
   "limit reached . resets (?P<time>.+)",
   "Claude AI usage limit reached\\|(?P<ts>\\d+)",
@@ -207,7 +205,6 @@ transcript_glob = "~/.claude/projects/*/*.jsonl"
 
 [agents.codex]
 launch_cmd     = "codex"
-resume_cmd     = "codex resume"
 limit_patterns = ["try again at (?P<time>.+)"]
 inject_style   = "text-enter"
 
