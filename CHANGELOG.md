@@ -6,6 +6,30 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-04
+
+This release also folds in everything previously listed under
+`[Unreleased]` that had never been version-stamped alongside a tagged
+release (M1-M5, Codex support, native Windows support, etc.) — see
+`### Added`/`### Fixed` below.
+
+### Removed
+- **`--daemon`** — re-exec/background-detach mode. On the pty backend (default
+  on Windows) it never provided real crash-safety (the agent was still bound
+  to the supervisor either way), and on tmux the same outcome is available by
+  just leaving the terminal open and checking `status` from another shell.
+- **`--watch-only`** — notify-at-reset-without-injecting mode. It undercut the
+  core auto-resume pitch and had no test coverage.
+- **`--no-auto-detach`** — opt-out of auto-detach-on-attach. Auto-detach is now
+  always on; no known use case relied on disabling it.
+- **`resume_cmd` config field** — vestigial from an earlier design; the actual
+  resume mechanism is prompt-injection, not this field, which was never read
+  except by a debug printout.
+
+These are breaking changes for anyone passing the removed flags or setting
+`resume_cmd` in `config.toml` — remove them from scripts/configs before
+upgrading.
+
 ### Changed
 - **`--auto-answer-prompts` now defaults to `true`** on both `run` and
   `attach-existing`. Previously off by default, the flag now answers detected
@@ -59,4 +83,5 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   times are cleared once the agent resumes, so `status` reports `RUNNING` with no
   leftover countdown.
 
-[Unreleased]: https://github.com/amanjaiman/sleeperagent/commits/main
+[Unreleased]: https://github.com/amanjaiman/sleeperagent/compare/v0.3.0...main
+[0.3.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.2.0...v0.3.0
