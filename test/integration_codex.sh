@@ -38,7 +38,20 @@ chmod +x "$AGENT"
 echo "== launching supervisor with --agent codex =="
 "$BIN" run --agent codex --name "$SESSION" --config "$CFG" --prompt "codex-continue" -- "$AGENT" >/tmp/ak_codex.log 2>&1 &
 SUP=$!
-sleep 14
+
+# Poll for the limit -> wait -> inject -> echo cycle instead of a fixed sleep
+# (detect + ~6s reset + 1s buffer + inject can lag noticeably on a loaded/CI
+# runner). Ceiling is generous; the marker+log or an early supervisor exit
+# both end the wait promptly.
+for _ in $(seq 1 40); do
+  if grep -q "codex-continue" "$MARKER" 2>/dev/null && grep -qi "source=relative" /tmp/ak_codex.log 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$SUP" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
 
 echo "== final pane =="
 tmux capture-pane -p -t "$SESSION" 2>/dev/null || echo "(session gone)"

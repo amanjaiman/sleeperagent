@@ -70,7 +70,21 @@ chmod +x "$AGENT"
 echo "== launching with --reprompt ollama:test =="
 "$BIN" run --agent fake --name "$SESSION" --config "$CFG" --reprompt ollama:test -- "$AGENT" >/tmp/ak_rp.log 2>&1 &
 SUP=$!
-sleep 14
+
+# Poll for the limit -> wait -> reprompt-generate -> inject -> echo cycle
+# instead of a fixed sleep (the extra reprompt/LLM round trip on top of the
+# usual detect+wait+inject timing makes a fixed duration even more likely to
+# race under a loaded/CI runner). Ceiling is generous; the marker or an early
+# supervisor exit both end the wait promptly.
+for _ in $(seq 1 40); do
+  if grep -qF "$LLM_TEXT" "$MARKER" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$SUP" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
 
 kill "$SUP" 2>/dev/null; wait "$SUP" 2>/dev/null
 echo "== supervisor log =="; cat /tmp/ak_rp.log
