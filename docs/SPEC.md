@@ -263,4 +263,3 @@ denylist         = ["rm -rf", "force push", "--force", "drop table"]
 ## 10. Open questions
 
 - For LLM reprompt, is transcript-tail enough context, or worth summarizing the whole session into a rolling "task memory" file?
-- Should auto-detach-on-user-activity be default-on or opt-in?

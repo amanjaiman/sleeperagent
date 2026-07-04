@@ -775,7 +775,6 @@ func TestAutoDetachOnUserAttach(t *testing.T) {
 	sup := New(Options{
 		Adapter: testAdapter(t), Tmux: pane, Prompt: prompt.NewStatic("continue"),
 		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
-		AutoDetach: true,
 	})
 	must(t, sup.tick())
 	if sup.State() != state.Detached {

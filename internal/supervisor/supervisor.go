@@ -113,9 +113,6 @@ type Options struct {
 	ResetBuffer  time.Duration
 	MaxWait      time.Duration
 	Cwd          string
-	// AutoDetach, when true, detaches automatically if a human attaches to the
-	// session while the supervisor is observing or waiting.
-	AutoDetach bool
 	// AutoAnswerPrompts, when true, answers generic interactive agent prompts
 	// with their first/default option. Dangerous: may approve tool calls.
 	AutoAnswerPrompts bool
@@ -279,7 +276,7 @@ func (s *Supervisor) tick() error {
 
 	// If a human has taken over the session, step aside rather than fighting them
 	// for the input. Only meaningful while observing or waiting.
-	if s.opt.AutoDetach && (s.st == state.Running || s.st == state.Waiting) {
+	if s.st == state.Running || s.st == state.Waiting {
 		if attached, aerr := s.opt.Tmux.ClientAttached(); aerr == nil && attached {
 			s.opt.Logf("user attached to the session; auto-detaching. It's all yours: %s", s.opt.Tmux.AttachHint())
 			s.st = state.Detached

@@ -103,7 +103,6 @@ Run flags:
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
   --auto-answer-prompts
                      answer interactive prompts with the first/default option (DANGEROUS)
-  --no-auto-detach   do NOT auto-detach when you attach to the session
   --no-notify        disable desktop notifications
 
 The trailing "-- launch-command..." is optional: omit it to use the adapter's
@@ -126,7 +125,6 @@ func runCmd(args []string) error {
 	name := fs.String("name", "", "instance / tmux session name")
 	promptText := fs.String("prompt", "", "static resume prompt")
 	cfgPath := fs.String("config", "", "path to config.toml")
-	noAutoDetach := fs.Bool("no-auto-detach", false, "do not auto-detach on user activity")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	backend := fs.String("backend", defaultBackend(), `session backend: "tmux" or "pty"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
@@ -246,7 +244,6 @@ func runCmd(args []string) error {
 		resumeText:        resumeText,
 		cfg:               cfg,
 		cwd:               cwd,
-		autoDetach:        !*noAutoDetach,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 		transparentTTY:    *backend == "pty",
@@ -269,7 +266,6 @@ type watchParams struct {
 	resumeText        string
 	cfg               config.Config
 	cwd               string
-	autoDetach        bool
 	autoAnswerPrompts bool
 	notifier          notify.Notifier
 	transparentTTY    bool
@@ -346,7 +342,6 @@ func watchSession(p watchParams) error {
 		ResetBuffer:       p.cfg.ResetBuffer.D(),
 		MaxWait:           p.cfg.MaxWait.D(),
 		Cwd:               p.cwd,
-		AutoDetach:        p.autoDetach,
 		AutoAnswerPrompts: p.autoAnswerPrompts,
 		Commands:          cmds,
 		OnUpdate:          writeRecord,
@@ -452,7 +447,6 @@ func attachExistingCmd(args []string) error {
 	target := fs.String("target", "", "tmux target to watch, e.g. mywork:0.1 (required)")
 	promptText := fs.String("prompt", "", "static resume prompt")
 	cfgPath := fs.String("config", "", "path to config.toml")
-	noAutoDetach := fs.Bool("no-auto-detach", false, "do not auto-detach on user activity")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
@@ -514,7 +508,6 @@ func attachExistingCmd(args []string) error {
 		resumeText:        resumeText,
 		cfg:               cfg,
 		cwd:               cwd,
-		autoDetach:        !*noAutoDetach,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 	})
