@@ -1,4 +1,4 @@
-// Package config loads AgentKeeper settings from a TOML file, layered over
+// Package config loads SleeperAgent settings from a TOML file, layered over
 // built-in defaults. The adapter patterns live here so that an agent CLI
 // format change is a one-line user fix, not a new release.
 package config
@@ -11,7 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
 )
 
 // Duration is a time.Duration that decodes from TOML strings like "3s".
@@ -59,7 +59,7 @@ type RepromptConfig struct {
 	Denylist       []string `toml:"denylist"`
 }
 
-// Config is the whole AgentKeeper configuration.
+// Config is the whole SleeperAgent configuration.
 type Config struct {
 	PollInterval Duration               `toml:"poll_interval"`
 	ResetBuffer  Duration               `toml:"reset_buffer"`
@@ -142,7 +142,7 @@ func Default() Config {
 // DefaultPath is the conventional config location.
 func DefaultPath() string {
 	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "agentkeeper", "config.toml")
+		return filepath.Join(dir, "sleeperagent", "config.toml")
 	}
 	return ""
 }

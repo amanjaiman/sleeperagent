@@ -1,6 +1,6 @@
-# Contributing to AgentKeeper
+# Contributing to SleeperAgent
 
-Thanks for your interest! AgentKeeper is a small, focused Go project and
+Thanks for your interest! SleeperAgent is a small, focused Go project and
 contributions are welcome.
 
 ## Development setup
@@ -9,7 +9,7 @@ contributions are welcome.
 - Clone, then:
 
 ```bash
-make build     # build ./agentkeeper
+make build     # build ./sleeperagent
 make test      # unit tests (no tmux needed)
 make check     # gofmt check + go vet + tests
 ```
@@ -32,7 +32,7 @@ You usually don't need to write code — agents are config-driven. Add an
 `[agents.<name>]` block to your `config.toml` (see
 [`config.example.toml`](config.example.toml)) with `launch_cmd`, `limit_patterns`
 (using `(?P<ts>)`, `(?P<time>)`, or `(?P<dur>)` named groups), and `inject_style`.
-Use `agentkeeper parse --agent <name> "<a real limit message>"` to confirm your
+Use `sleeperagent parse --agent <name> "<a real limit message>"` to confirm your
 patterns match and resolve a reset time.
 
 ## Reporting limit-string drift

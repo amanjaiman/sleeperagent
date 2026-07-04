@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
-	"github.com/amanjaiman/agentkeeper/internal/config"
-	"github.com/amanjaiman/agentkeeper/internal/notify"
-	"github.com/amanjaiman/agentkeeper/internal/prompt"
-	"github.com/amanjaiman/agentkeeper/internal/statefile"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/config"
+	"github.com/amanjaiman/sleeperagent/internal/notify"
+	"github.com/amanjaiman/sleeperagent/internal/prompt"
+	"github.com/amanjaiman/sleeperagent/internal/statefile"
 )
 
 type watchTestPane struct {
@@ -34,7 +34,7 @@ func (n *captureNotifier) Notify(e notify.Event) {
 }
 
 func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
-	t.Setenv("AGENTKEEPER_STATE_DIR", t.TempDir())
+	t.Setenv("SLEEPERAGENT_STATE_DIR", t.TempDir())
 	ad, err := adapter.Compile("claude", adapter.Spec{
 		LaunchCmd:     "claude",
 		LimitPatterns: []string{`(?i)limit reached.*resets\s+(?P<time>.+)`},

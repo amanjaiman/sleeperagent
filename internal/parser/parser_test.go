@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/config"
+	"github.com/amanjaiman/sleeperagent/internal/config"
 )
 
 func claudePatterns() []*regexp.Regexp {

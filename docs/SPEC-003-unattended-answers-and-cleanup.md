@@ -1,4 +1,4 @@
-# AgentKeeper — Unattended Answers & Status Cleanup (post-M1 field testing, round 2)
+# SleeperAgent — Unattended Answers & Status Cleanup (post-M1 field testing, round 2)
 
 *Remediation spec for four issues found during the second hands-on test on Windows (ConPTY backend, Claude Code).*
 
@@ -36,7 +36,7 @@ tool-permission prompt, and a persistent reset banner) — capture those into
 ## G. `/rate-limit-options` is still not auto-selected
 
 ### Symptom
-When Claude shows `/rate-limit-options` and asks what to do, AgentKeeper does
+When Claude shows `/rate-limit-options` and asks what to do, SleeperAgent does
 **not** press `1` ("Stop and wait for the limit to reset"). The user must select
 it by hand — defeating the unattended promise.
 
@@ -73,7 +73,7 @@ the option text differs from the gate phrase (e.g. "1. Wait until your limit
 resets", "1. Pause until reset"), the rule is permanently stuck in notify-only.
 
 ### Fix
-1. **Capture the real menu.** Use `agentkeeper parse` / a transcript grab to
+1. **Capture the real menu.** Use `sleeperagent parse` / a transcript grab to
    record the exact `/rate-limit-options` screen (numbered list vs. arrow
    selector, and the precise wording of the safe option) into
    `internal/parser/testdata/claude/rate-limit-menu.txt`.
@@ -129,7 +129,7 @@ prompt**, selects the **first / default** option automatically:
 This is the *general* analogue of §G's single safe rule, so it must be:
 
 - **Off by default and loudly opt-in.** Same posture as `--yolo`
-  ([SPEC.md §7](SPEC.md), [main.go:156-162](../cmd/agentkeeper/main.go)): print a
+  ([SPEC.md §7](SPEC.md), [main.go:156-162](../cmd/sleeperagent/main.go)): print a
   warning at launch that arbitrary prompts — including ones that run tool calls —
   will be auto-accepted.
 - **Distinct from `--yolo`.** `--yolo` removes the prompts up front (it passes
@@ -201,7 +201,7 @@ which reads like "something needs my attention" when nothing does.
 When the agent exits on its own, the supervisor reaches `ENDED` and
 `watchSession` returns — but it only **removes** the state record on a *kill*,
 not on a self-end. Compare the two branches
-([main.go:382-392](../cmd/agentkeeper/main.go)):
+([main.go:382-392](../cmd/sleeperagent/main.go)):
 
 ```go
 if sup.SessionKilled() {
@@ -215,9 +215,9 @@ if sup.SessionEnded() {
 ```
 
 So the final `ENDED` snapshot that `OnUpdate` persisted
-([main.go:321-341](../cmd/agentkeeper/main.go)) is never cleaned up. `status`
+([main.go:321-341](../cmd/sleeperagent/main.go)) is never cleaned up. `status`
 then shows it indefinitely, and because the supervisor PID is gone, `anyStale`
-appends the `*` and the footnote ([main.go:744-752, 876-883](../cmd/agentkeeper/main.go)).
+appends the `*` and the footnote ([main.go:744-752, 876-883](../cmd/sleeperagent/main.go)).
 (The stray `RESET` countdown in the line is issue **J**, below.)
 
 ### Fix
@@ -227,11 +227,11 @@ of `watchSession`, call `statefile.Remove(p.instance)` after logging.
 
 Sequencing/visibility considerations:
 - The `ENDED → notify` transition already fires via the last `OnUpdate`
-  ([main.go:601-603](../cmd/agentkeeper/main.go)), so the user is still told the
+  ([main.go:601-603](../cmd/sleeperagent/main.go)), so the user is still told the
   session ended *before* the record disappears. Removing the record after that is
   safe and is the desired "don't leave me confused" behavior.
 - This mirrors what `stop`/`detach`/`rm` already do for dead records via
-  `cleanupIfDead` ([main.go:771-777](../cmd/agentkeeper/main.go)) — so the manual
+  `cleanupIfDead` ([main.go:771-777](../cmd/sleeperagent/main.go)) — so the manual
   and automatic paths converge on "a dead session leaves no record."
 - Keep the `ENDED*` rendering + footnote in `status` for the **transient** window
   where a supervisor died *uncleanly* (crash) without going through the
@@ -240,7 +240,7 @@ Sequencing/visibility considerations:
 
 ### Acceptance criteria
 - After the agent exits in a watched session (pty or tmux), a subsequent
-  `agentkeeper status` does **not** list that instance.
+  `sleeperagent status` does **not** list that instance.
 - The "session ended" desktop/webhook notification still fires.
 - A supervisor that crashes without ending cleanly still shows `ENDED*`/stale and
   is removable via `rm`.
@@ -250,7 +250,7 @@ Sequencing/visibility considerations:
 ## J. After resume, `status` shows `WAITING` again with a *next-day* reset
 
 ### Symptom
-After AgentKeeper resumed the session once the limit reset, a later `status`
+After SleeperAgent resumed the session once the limit reset, a later `status`
 still showed `WAITING` with the **same clock time but the next day** (e.g. the
 `19:11 (in 21h34m38s)` above). Expected: `RUNNING` with no reset (`—`).
 
@@ -332,4 +332,4 @@ the `/rate-limit-options` menu, a tool-permission / clarify prompt, and a
 persistent reset banner (ideally one with a live countdown). Capture them into
 `internal/parser/testdata/claude/` and drive the regexes, the safety gate, the
 generic prompt detector, and the re-detection guard from those fixtures. The
-existing `agentkeeper parse` command remains the capture/tuning tool.
+existing `sleeperagent parse` command remains the capture/tuning tool.

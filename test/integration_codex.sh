@@ -5,14 +5,14 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 SESSION="ak-codex-$$"
 MARKER="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 
-cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null; rm -rf "$MARKER" "$CFG" "$AGENT" "$AGENTKEEPER_STATE_DIR"; }
+cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null; rm -rf "$MARKER" "$CFG" "$AGENT" "$SLEEPERAGENT_STATE_DIR"; }
 trap cleanup EXIT
 
 # Fast timings only; the default codex adapter patterns are used as-is.

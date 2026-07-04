@@ -4,8 +4,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+BIN="$ROOT/sleeperagent-linux"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 N1="ak-m2a-$$"
 N2="ak-m2b-$$"
 fail=0
@@ -13,7 +13,7 @@ fail=0
 cleanup() {
   tmux kill-session -t "$N1" 2>/dev/null
   tmux kill-session -t "$N2" 2>/dev/null
-  rm -rf "$AGENTKEEPER_STATE_DIR"
+  rm -rf "$SLEEPERAGENT_STATE_DIR"
 }
 trap cleanup EXIT
 

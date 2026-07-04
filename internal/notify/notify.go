@@ -1,4 +1,4 @@
-// Package notify delivers best-effort alerts on AgentKeeper state changes: a
+// Package notify delivers best-effort alerts on SleeperAgent state changes: a
 // desktop notification (via the OS's native tool) and/or an optional webhook
 // POST. Every delivery is fire-and-forget and never blocks or fails the loop.
 package notify

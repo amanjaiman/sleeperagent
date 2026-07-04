@@ -1,4 +1,4 @@
-# AgentKeeper — Technical Specification
+# SleeperAgent — Technical Specification
 
 *A cross-agent watchdog that resumes Claude Code / Codex sessions when usage limits reset — and gets out of your way the moment you want to take over.*
 
@@ -10,7 +10,7 @@ Draft v0.1 · June 2026
 
 Coding agents (Claude Code, Codex CLI) hard-stop when a 5-hour or weekly usage limit is hit. If the reset falls while you're asleep, the task sits dead until you manually type "continue." Existing tools ([terryso/claude-auto-resume](https://github.com/terryso/claude-auto-resume), [henryaj/autoclaude](https://github.com/henryaj/autoclaude)) solve this for a single agent but each has gaps: single-agent only, tmux-only, or no way to hand the live session back to a human cleanly.
 
-**AgentKeeper** is a supervisor process that:
+**SleeperAgent** is a supervisor process that:
 
 1. Runs the agent inside a session it can observe and inject input into (tmux pane or PTY).
 2. Detects the usage-limit message and parses the reset time.
@@ -41,7 +41,7 @@ The graceful-handoff requirement pushes us toward **tmux as the primary backend*
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                      AgentKeeper (supervisor)             │
+│                      SleeperAgent (supervisor)             │
 │                                                           │
 │  ┌────────────┐   ┌──────────────┐   ┌─────────────────┐  │
 │  │  Watcher   │──▶│ State Machine│──▶│  Injector       │  │
@@ -152,14 +152,14 @@ LLM mode is purely additive: if Ollama is unreachable or low-confidence, the too
 Three ways to detach, all of which **leave the agent session running**:
 
 1. **Hotkey** in the supervisor's status view: `d` = detach (stop listening, keep session), `q` = quit supervisor *and* leave session, `k` = kill session too (with confirm).
-2. **Command:** `agentkeeper detach` (or `stop --keep-session`) signals a running supervisor over its control socket / pidfile to enter DETACHED and exit.
-3. **Auto-detach on user activity:** while WAITING, if the watcher sees the user has attached to the tmux session and typed (pane input changed from a human, not the injector), AgentKeeper assumes the user is taking over and auto-detaches with a printed note. This directly serves the "I'll be at my desk when it resets" case.
+2. **Command:** `sleeperagent detach` (or `stop --keep-session`) signals a running supervisor over its control socket / pidfile to enter DETACHED and exit.
+3. **Auto-detach on user activity:** while WAITING, if the watcher sees the user has attached to the tmux session and typed (pane input changed from a human, not the injector), SleeperAgent assumes the user is taking over and auto-detaches with a printed note. This directly serves the "I'll be at my desk when it resets" case.
 
-Because the agent lives in tmux, after any detach the user just runs `tmux attach -t agentkeeper/<name>` (printed on detach) and continues the exact conversation — nothing is lost. On SIGINT (Ctrl-C), default behavior is **detach, not kill**, so an accidental Ctrl-C never destroys the session; killing requires explicit `k`/`--kill`.
+Because the agent lives in tmux, after any detach the user just runs `tmux attach -t sleeperagent/<name>` (printed on detach) and continues the exact conversation — nothing is lost. On SIGINT (Ctrl-C), default behavior is **detach, not kill**, so an accidental Ctrl-C never destroys the session; killing requires explicit `k`/`--kill`.
 
 ### 4.7 State persistence
 
-A small state file (`~/.local/state/agentkeeper/<name>.json`) holds: agent type, tmux target, current state, parsed reset time, injection latch, and prompt config. Lets `agentkeeper status` report from any shell and lets a crashed supervisor recover the pending wait on restart.
+A small state file (`~/.local/state/sleeperagent/<name>.json`) holds: agent type, tmux target, current state, parsed reset time, injection latch, and prompt config. Lets `sleeperagent status` report from any shell and lets a crashed supervisor recover the pending wait on restart.
 
 ---
 
@@ -167,26 +167,26 @@ A small state file (`~/.local/state/agentkeeper/<name>.json`) holds: agent type,
 
 ```bash
 # Start: launch claude inside a managed tmux session and watch it
-agentkeeper run --agent claude --name feature-x -- claude
+sleeperagent run --agent claude --name feature-x -- claude
 
 # Codex with a custom static resume prompt
-agentkeeper run --agent codex --prompt "Continue; run the tests after." -- codex
+sleeperagent run --agent codex --prompt "Continue; run the tests after." -- codex
 
 # Use a local model to regenerate the continuation prompt each resume
-agentkeeper run --agent claude --reprompt ollama:llama3.1 -- claude
+sleeperagent run --agent claude --reprompt ollama:llama3.1 -- claude
 
 # Attach to an already-running agent in tmux pane (don't launch)
-agentkeeper attach-existing --agent claude --target mywork:0.1
+sleeperagent attach-existing --agent claude --target mywork:0.1
 
 # Inspect / control
-agentkeeper status            # state, reset countdown, which prompt mode
-agentkeeper detach            # stop listening, keep the session
-agentkeeper stop --kill       # stop listening and kill the session
+sleeperagent status            # state, reset countdown, which prompt mode
+sleeperagent detach            # stop listening, keep the session
+sleeperagent stop --kill       # stop listening and kill the session
 ```
 
 Live status view (when run in foreground) shows: agent, state, reset countdown, next prompt preview, and the hotkey legend. Mirrors autoclaude's countdown UX but adds the prompt preview and detach affordances.
 
-### Config file (`~/.config/agentkeeper/config.toml`)
+### Config file (`~/.config/sleeperagent/config.toml`)
 
 User-editable adapter patterns so a CLI format change is a one-line fix, not a release:
 
@@ -229,7 +229,7 @@ denylist         = ["rm -rf", "force push", "--force", "drop table"]
 - **Clock/timezone skew.** Always add `reset_buffer`; parse clock times against local tz; if reset parses to the past, roll forward.
 - **Resume still limited.** If the first post-reset prompt re-triggers the limit string, treat as a fresh LIMITED event and re-wait (with backoff, max 3 cycles before notifying).
 - **User attached mid-wait.** Auto-detach (§4.6) so the supervisor and human don't both type.
-- **Multiple sessions.** Each `agentkeeper run` is its own named instance/state file; no shared global lock.
+- **Multiple sessions.** Each `sleeperagent run` is its own named instance/state file; no shared global lock.
 
 ---
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# M4 end-to-end against REAL tmux + a FAKE Ollama server: on reset, AgentKeeper
+# M4 end-to-end against REAL tmux + a FAKE Ollama server: on reset, SleeperAgent
 # reads the transcript tail, asks the (fake) local model for a next instruction,
 # validates it, and injects THAT generated instruction instead of the static
 # prompt. Run from WSL.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 SESSION="ak-rp-$$"
 PORT=11987
 LLM_TEXT="Continue implementing the parser in parser.go"
@@ -14,12 +14,12 @@ MARKER="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
 TRANS="$(mktemp -d)"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 
 cleanup() {
   tmux kill-session -t "$SESSION" 2>/dev/null
   [ -n "${OLLAMA_PID:-}" ] && kill "$OLLAMA_PID" 2>/dev/null
-  rm -rf "$MARKER" "$CFG" "$AGENT" "$TRANS" "$AGENTKEEPER_STATE_DIR"
+  rm -rf "$MARKER" "$CFG" "$AGENT" "$TRANS" "$SLEEPERAGENT_STATE_DIR"
 }
 trap cleanup EXIT
 

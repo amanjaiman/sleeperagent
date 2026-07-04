@@ -1,5 +1,5 @@
 // Package statefile persists one supervisor instance's state to disk so that
-// `agentkeeper status` can report from any shell, and so a control command
+// `sleeperagent status` can report from any shell, and so a control command
 // (detach/stop) can reach a running supervisor without an open socket. The
 // control channel is a tiny file the supervisor polls — deliberately simple and
 // cross-platform (no ports, no OS-specific socket code); latency is bounded by
@@ -35,24 +35,24 @@ type Record struct {
 }
 
 // Dir is the directory holding state and control files. An explicit
-// AGENTKEEPER_STATE_DIR overrides everything (used in tests); otherwise it
+// SLEEPERAGENT_STATE_DIR overrides everything (used in tests); otherwise it
 // prefers the XDG state location on Unix and the OS config dir on Windows.
 func Dir() string {
-	if d := os.Getenv("AGENTKEEPER_STATE_DIR"); d != "" {
+	if d := os.Getenv("SLEEPERAGENT_STATE_DIR"); d != "" {
 		return d
 	}
 	if runtime.GOOS != "windows" {
 		if x := os.Getenv("XDG_STATE_HOME"); x != "" {
-			return filepath.Join(x, "agentkeeper")
+			return filepath.Join(x, "sleeperagent")
 		}
 		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, ".local", "state", "agentkeeper")
+			return filepath.Join(home, ".local", "state", "sleeperagent")
 		}
 	}
 	if cfg, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(cfg, "agentkeeper", "state")
+		return filepath.Join(cfg, "sleeperagent", "state")
 	}
-	return filepath.Join(os.TempDir(), "agentkeeper")
+	return filepath.Join(os.TempDir(), "sleeperagent")
 }
 
 // safeName rejects names that would escape the state dir.

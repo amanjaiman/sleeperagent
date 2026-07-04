@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # End-to-end smoke test against REAL tmux: a fake agent prints a usage-limit
-# message with a reset ~6s out, then echoes whatever AgentKeeper injects. We
+# message with a reset ~6s out, then echoes whatever SleeperAgent injects. We
 # assert the static "continue" prompt actually arrived through tmux send-keys.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 SESSION="ak-itest-$$"
 MARKER="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"

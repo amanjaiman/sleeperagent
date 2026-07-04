@@ -5,15 +5,15 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+BIN="$ROOT/sleeperagent-linux"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 N="ak-dpty-$$"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
 MARKER="$(mktemp)"
 fail=0
 
-cleanup() { rm -rf "$CFG" "$AGENT" "$MARKER" "$AGENTKEEPER_STATE_DIR"; }
+cleanup() { rm -rf "$CFG" "$AGENT" "$MARKER" "$SLEEPERAGENT_STATE_DIR"; }
 trap cleanup EXIT
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; fail=1; fi; }
 
@@ -43,11 +43,11 @@ check "parent printed the pty-daemon note" 'echo "$out" | grep -qi "pty backend"
 check "parent printed 'started in background'" 'echo "$out" | grep -q "started in background"'
 
 sleep 15
-echo "== daemon log =="; cat "$AGENTKEEPER_STATE_DIR/$N.log" 2>/dev/null
+echo "== daemon log =="; cat "$SLEEPERAGENT_STATE_DIR/$N.log" 2>/dev/null
 echo "== marker =="; cat "$MARKER" 2>/dev/null
 
 check "daemon injected the resume prompt via pty" 'grep -q "pty-daemon-continue" "$MARKER" 2>/dev/null'
-check "log shows the limit was detected" 'grep -qi "usage limit detected" "$AGENTKEEPER_STATE_DIR/$N.log" 2>/dev/null'
+check "log shows the limit was detected" 'grep -qi "usage limit detected" "$SLEEPERAGENT_STATE_DIR/$N.log" 2>/dev/null'
 
 if [ "$fail" -eq 0 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL"; fi
 exit "$fail"

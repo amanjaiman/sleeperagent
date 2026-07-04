@@ -5,15 +5,15 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 SESSION="ak-att-$$"
 MARKER="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 fail=0
 
-cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null; rm -rf "$MARKER" "$CFG" "$AGENT" "$AGENTKEEPER_STATE_DIR"; }
+cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null; rm -rf "$MARKER" "$CFG" "$AGENT" "$SLEEPERAGENT_STATE_DIR"; }
 trap cleanup EXIT
 check() { if eval "$2"; then echo "  ok: $1"; else echo "  FAIL: $1"; fail=1; fi; }
 
@@ -36,7 +36,7 @@ while IFS= read -r line; do echo "got: \$line"; echo "\$line" >> "$MARKER"; done
 EOF
 chmod +x "$AGENT"
 
-# We launch the session ourselves; AgentKeeper only attaches.
+# We launch the session ourselves; SleeperAgent only attaches.
 tmux new-session -d -s "$SESSION" "bash $AGENT"
 sleep 2
 

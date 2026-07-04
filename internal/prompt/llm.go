@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/transcript"
+	"github.com/amanjaiman/sleeperagent/internal/transcript"
 )
 
 // Generator produces a completion from a model. *ollama.Client satisfies it;
@@ -20,7 +20,7 @@ type Generator interface {
 // LLM builds the resume prompt by asking a local model for a concrete next
 // instruction, given the recent transcript and the git diff of work done. It is
 // purely additive: on any failure (server down, empty/over-long/denylisted
-// output) it returns Fallback, so AgentKeeper always resumes.
+// output) it returns Fallback, so SleeperAgent always resumes.
 type LLM struct {
 	Model          string
 	Client         Generator

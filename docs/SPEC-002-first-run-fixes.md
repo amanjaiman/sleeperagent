@@ -1,4 +1,4 @@
-# AgentKeeper — First-Run Fixes (post-M1 field testing)
+# SleeperAgent — First-Run Fixes (post-M1 field testing)
 
 *Remediation spec for the six issues found during the first hands-on test on Windows (ConPTY backend).*
 
@@ -14,7 +14,7 @@ problems. They fall into three buckets:
 | # | Issue | Bucket |
 |---|---|---|
 | A | Default Claude limit patterns miss the real message ("session limit"); user had to hand-edit `config.toml` | Detection |
-| B | `agentkeeper` is not on `PATH`; user had to invoke the full `.exe` path | Install / UX |
+| B | `sleeperagent` is not on `PATH`; user had to invoke the full `.exe` path | Install / UX |
 | C | Countdown logs every 30s — noise with no value | Logging |
 | D | Agent TUI and supervisor logs share one terminal → corrupted UI; agent output invisible on resume | Backend / UX |
 | E | Claude's `/rate-limit-options` interactive menu blocks an unattended supervisor | Detection / unattended |
@@ -31,8 +31,8 @@ include the code; it is the contract the implementation must satisfy.
 ## A. Default Claude limit patterns are incomplete
 
 ### Symptom
-Out of the box, AgentKeeper never detected the limit. The user had to add to
-`%APPDATA%\agentkeeper\config.toml`:
+Out of the box, SleeperAgent never detected the limit. The user had to add to
+`%APPDATA%\sleeperagent\config.toml`:
 
 ```toml
 [agents.claude]
@@ -102,18 +102,18 @@ should be trimmed so the clock parser gets a clean token.
 - A `testdata/` corpus of real, anonymized Claude limit screens (one file per
   variant) lives in `internal/parser/testdata/` and each is asserted to Detect +
   Resolve to a sane reset time.
-- `agentkeeper parse --agent claude "<each variant>"` matches with **default
+- `sleeperagent parse --agent claude "<each variant>"` matches with **default
   config, no user edits**.
 - The "approaching limit" banner does **not** match.
 - Existing parser tests still pass.
 
 ---
 
-## B. `agentkeeper` must run as a bare command
+## B. `sleeperagent` must run as a bare command
 
 ### Symptom
-The user had to type `C:\Users\amanj\Documents\agentkeeper\agentkeeper.exe …`
-because agents are started from the project directory, not the repo. `agentkeeper`
+The user had to type `C:\Users\amanj\Documents\sleeperagent\sleeperagent.exe …`
+because agents are started from the project directory, not the repo. `sleeperagent`
 alone was "command not found".
 
 ### Root cause
@@ -127,7 +127,7 @@ Primary: add a self-installing subcommand so a downloaded binary can put itself
 on `PATH` with one command.
 
 ```
-agentkeeper install [--dir DIR]   copy this binary to a PATH directory
+sleeperagent install [--dir DIR]   copy this binary to a PATH directory
 ```
 
 Behavior:
@@ -135,7 +135,7 @@ Behavior:
   bin dir, `chmod +x` on Unix.
 - Default target dir:
   - **Windows:** `%LOCALAPPDATA%\Microsoft\WindowsApps` (already on `PATH` for
-    most users) or `%LOCALAPPDATA%\Programs\agentkeeper` (then print the exact
+    most users) or `%LOCALAPPDATA%\Programs\sleeperagent` (then print the exact
     `setx PATH` / Settings step if not yet on `PATH`).
   - **macOS/Linux:** `~/.local/bin` (print the `export PATH` line if absent).
 - Detect whether the chosen dir is already on `PATH`; if not, print the precise,
@@ -150,11 +150,11 @@ Secondary (release hygiene, separate work item):
 - Consider `scoop` / `winget` / Homebrew tap later.
 
 Docs: README "Install" gains a "Put it on your PATH" subsection pointing at
-`agentkeeper install`.
+`sleeperagent install`.
 
 ### Acceptance criteria
-- On a clean machine, after downloading the binary, `./agentkeeper install`
-  followed by opening a new shell makes `agentkeeper version` work from any dir.
+- On a clean machine, after downloading the binary, `./sleeperagent install`
+  followed by opening a new shell makes `sleeperagent version` work from any dir.
 - If the target dir isn't on `PATH`, the command prints exact remediation and
   does not claim success.
 
@@ -163,7 +163,7 @@ Docs: README "Install" gains a "Put it on your PATH" subsection pointing at
 ## C. Stop logging the countdown every 30s
 
 ### Symptom
-While WAITING, AgentKeeper prints `waiting <d> until reset` every 30 seconds.
+While WAITING, SleeperAgent prints `waiting <d> until reset` every 30 seconds.
 The user finds this pointless — they can run `status` on demand.
 
 ### Root cause
@@ -174,8 +174,8 @@ countdown log to every 30s during WAITING.
 - **Remove the periodic countdown log.** The one-time "reset at … waiting <d>"
   on entry to WAITING ([supervisor.go:352](../internal/supervisor/supervisor.go))
   stays — it states the plan once.
-- The live countdown remains available via `agentkeeper status` (already reads
-  `WaitUntil` from the state file, [main.go:697-706](../cmd/agentkeeper/main.go)).
+- The live countdown remains available via `sleeperagent status` (already reads
+  `WaitUntil` from the state file, [main.go:697-706](../cmd/sleeperagent/main.go)).
 - Optional: a very sparse heartbeat (e.g. hourly) only under a future
   `--verbose` flag. Not on by default.
 - Remove now-dead `lastCountdown` bookkeeping
@@ -206,7 +206,7 @@ has no such separation**:
 
 A TUI that owns the screen (alt-screen, absolute cursor moves) interleaved with
 scrolling log lines = corruption. Worse, during watching `hotkeys.Listen` puts
-stdin in raw mode and consumes it ([main.go:312-315](../cmd/agentkeeper/main.go)),
+stdin in raw mode and consumes it ([main.go:312-315](../cmd/sleeperagent/main.go)),
 so the user can *see* the agent but cannot *type* to it until detach.
 
 This is inherent to a single-terminal backend; on Windows there is no tmux, so
@@ -214,15 +214,15 @@ this path must be made first-class, not treated as a degraded fallback.
 
 ### Fix — "transparent pass-through" mode for pty/ConPTY
 Make the pty/ConPTY backend behave as if the user had run the agent directly,
-with AgentKeeper watching silently in the background:
+with SleeperAgent watching silently in the background:
 
 1. **Supervisor logs go to the per-instance logfile, not the TTY**, whenever the
    backend is echoing the agent to that same TTY. Reuse the daemon logfile path
-   (`<state-dir>/<instance>.log`, [main.go:414](../cmd/agentkeeper/main.go)).
+   (`<state-dir>/<instance>.log`, [main.go:414](../cmd/sleeperagent/main.go)).
    The TTY shows **only the agent**.
 2. **State transitions surface out-of-band**, not as inline log spam:
    desktop/webhook notifications (already wired,
-   [main.go:522-545](../cmd/agentkeeper/main.go)) + the logfile + `status`.
+   [main.go:522-545](../cmd/sleeperagent/main.go)) + the logfile + `status`.
    Optionally a single non-scrolling status line (terminal title bar via
    `\x1b]0;…\x07`, which does not disturb the TUI body).
 3. **Forward stdin to the agent during RUNNING/WAITING**, not only after detach.
@@ -232,8 +232,8 @@ with AgentKeeper watching silently in the background:
 4. **Rework hotkeys for pass-through.** Raw-stdin hotkeys conflict with handing
    stdin to the agent. On pty/ConPTY:
    - drop the stdin hotkey listener;
-   - control via `agentkeeper detach` / `stop` from another shell (already works
-     via the control file, [main.go:548-568](../cmd/agentkeeper/main.go));
+   - control via `sleeperagent detach` / `stop` from another shell (already works
+     via the control file, [main.go:548-568](../cmd/sleeperagent/main.go));
    - forward Ctrl-C to the agent (so the user can interrupt the agent normally).
      Supervisor detach-on-Ctrl-C is a tmux-mode affordance; document that on
      pty/ConPTY you detach with the `detach` command. (Alternative: a rare escape
@@ -245,11 +245,11 @@ This single change fixes both halves of the symptom: the TUI renders correctly
 (no interleaved logs), and the agent stays fully visible across resume.
 
 ### Acceptance criteria
-- Running `agentkeeper run -- claude` on Windows shows Claude's TUI **uncorrupted**
+- Running `sleeperagent run -- claude` on Windows shows Claude's TUI **uncorrupted**
   for the entire lifecycle (running → limited → waiting → resuming → running).
 - No supervisor log lines appear on the TTY in pty/ConPTY mode; they are in the
   logfile, and transitions fire notifications.
-- The user can type to the agent at any time while AgentKeeper watches.
+- The user can type to the agent at any time while SleeperAgent watches.
 - The injected resume prompt is visible in the agent on reset.
 
 ---
@@ -317,7 +317,7 @@ than a default that might select the wrong option.
 ## F. Terminal floods with escape sequences after a kill
 
 ### Symptom
-After killing the AgentKeeper session, the shell (a *different* project's prompt
+After killing the SleeperAgent session, the shell (a *different* project's prompt
 in the screenshot) is flooded with sequences like `^[[<35;30;34M`,
 `^[[<32;36;38m`, etc., that never stop.
 
@@ -350,7 +350,7 @@ Requirements:
   and Windows ConPTY — both echo to stdout).
 - Call it from `Close()` and ensure `Close()` runs on all exit paths: normal
   exit, `detach`, `kill`/`CmdKill`, Ctrl-C/SIGTERM (the signal handler in
-  [watchSession](../cmd/agentkeeper/main.go) must reach `pc.Close()` — today
+  [watchSession](../cmd/sleeperagent/main.go) must reach `pc.Close()` — today
   `defer pc.Close()` is in `runCmd` so it covers the signal path; verify it also
   covers the kill-from-control-file path).
 - Also restore stdin termios if raw mode was set (it's deferred in `Foreground`,
@@ -359,7 +359,7 @@ Requirements:
 - Idempotent and safe to send even if the agent had not enabled those modes.
 
 ### Acceptance criteria
-- After `agentkeeper stop --kill` (or Ctrl-C, or the agent exiting) in
+- After `sleeperagent stop --kill` (or Ctrl-C, or the agent exiting) in
   pty/ConPTY mode, the shell prompt is clean: moving the mouse prints nothing,
   the cursor is visible, and SGR colors are reset.
 - Verified on Windows (the reported case) and on a Unix pty.
@@ -383,5 +383,5 @@ the pty backend / logging and should land together.
 Several fixes (A, E) depend on **real captured strings** from current Claude
 Code. Build an `internal/parser/testdata/` corpus first (limit screens, the
 approaching-limit banner, the `/rate-limit-options` menu) and drive the regex /
-auto-response defaults + regression tests from it. The existing `agentkeeper
+auto-response defaults + regression tests from it. The existing `sleeperagent
 parse` command is the capture/tuning tool.

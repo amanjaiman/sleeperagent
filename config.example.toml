@@ -1,6 +1,6 @@
-# AgentKeeper configuration.
-# Copy to your OS config dir (e.g. ~/.config/agentkeeper/config.toml on Linux,
-# %AppData%\agentkeeper\config.toml on Windows) and edit as needed.
+# SleeperAgent configuration.
+# Copy to your OS config dir (e.g. ~/.config/sleeperagent/config.toml on Linux,
+# %AppData%\sleeperagent\config.toml on Windows) and edit as needed.
 # Any field you omit falls back to the built-in default.
 
 poll_interval = "3s"   # how often the pane is captured
@@ -26,7 +26,7 @@ transcript_glob = "~/.claude/projects/*/*.jsonl"
 # unattended tool calls with no permission prompts).
 yolo_flag       = "--dangerously-skip-permissions"
 
-# Built-in by default: when Claude's rate-limit menu appears, AgentKeeper auto-
+# Built-in by default: when Claude's rate-limit menu appears, SleeperAgent auto-
 # selects "1. Stop and wait for the limit to reset" so you don't have to. It only
 # presses a key once the verified stop-and-wait wording is on screen. Override or
 # disable it here (set keys = "" to turn the key-press into a notify-only prompt).
@@ -49,7 +49,7 @@ yolo_flag      = "--dangerously-bypass-approvals-and-sandbox"
 
 # Local-LLM reprompt. Active only with `--reprompt ollama:<model>`; otherwise the
 # static prompt is used. On any failure (server down, empty/over-long/denylisted
-# output) AgentKeeper falls back to the static prompt.
+# output) SleeperAgent falls back to the static prompt.
 [reprompt]
 provider         = "ollama"
 model            = "llama3.1"            # used when --reprompt omits the model

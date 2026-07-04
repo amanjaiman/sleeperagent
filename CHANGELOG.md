@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to AgentKeeper are documented here. The format is based on
+All notable changes to SleeperAgent are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -28,7 +28,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   backend (incl. Windows ConPTY) runs headless and ends on detach. Cross-platform
   detach (setsid on Unix, detached process group on Windows).
 - **Native Windows support** — a ConPTY-based `pty` backend (the default on
-  Windows) runs a native Windows agent in a pseudoconsole, so AgentKeeper works on
+  Windows) runs a native Windows agent in a pseudoconsole, so SleeperAgent works on
   Windows with no WSL, including `--daemon`. Linux/macOS/Windows are all
   first-class.
 - **Dead-session detection** — the supervisor now stops cleanly (new `ENDED`
@@ -52,4 +52,4 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   times are cleared once the agent resumes, so `status` reports `RUNNING` with no
   leftover countdown.
 
-[Unreleased]: https://github.com/amanjaiman/agentkeeper/commits/main
+[Unreleased]: https://github.com/amanjaiman/sleeperagent/commits/main

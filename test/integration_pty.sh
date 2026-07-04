@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # M5 end-to-end with the PTY backend (no tmux) + a webhook: a fake agent in a
-# pty hits a limit, AgentKeeper detects it on the raw stream, waits, injects the
+# pty hits a limit, SleeperAgent detects it on the raw stream, waits, injects the
 # resume prompt, and POSTs notifications to a local webhook. Run from WSL.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/agentkeeper-linux"
+BIN="$ROOT/sleeperagent-linux"
 PORT=11991
 MARKER="$(mktemp)"
 HOOKLOG="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
-export AGENTKEEPER_STATE_DIR="$(mktemp -d)"
+export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
 
 cleanup() {
   [ -n "${HOOK_PID:-}" ] && kill "$HOOK_PID" 2>/dev/null
   [ -n "${SUP:-}" ] && kill "$SUP" 2>/dev/null
   exec 9<&- 2>/dev/null
-  rm -rf "$MARKER" "$HOOKLOG" "$CFG" "$AGENT" "$AGENTKEEPER_STATE_DIR" "$STDIN_FIFO"
+  rm -rf "$MARKER" "$HOOKLOG" "$CFG" "$AGENT" "$SLEEPERAGENT_STATE_DIR" "$STDIN_FIFO"
 }
 trap cleanup EXIT
 
@@ -64,7 +64,7 @@ echo "== launching with --backend pty --webhook =="
 # script relays its OWN stdin into the pty. In an interactive shell that stdin
 # just sits idle, but under CI (a genuinely non-interactive step backgrounded
 # with `&`) it's closed/`/dev/null` and reads as immediate EOF -- which made
-# `script` (and the wrapped agentkeeper process with it) exit within ~1-2s,
+# `script` (and the wrapped sleeperagent process with it) exit within ~1-2s,
 # long before the limit/wait/resume cycle could run. Give it a fifo opened
 # read-write so the read end never sees EOF, even though nothing is written.
 STDIN_FIFO="$(mktemp -u)"

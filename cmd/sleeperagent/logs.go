@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amanjaiman/agentkeeper/internal/statefile"
+	"github.com/amanjaiman/sleeperagent/internal/statefile"
 )
 
 // instanceLogPath is where a pty/daemon instance's supervisor log is written.

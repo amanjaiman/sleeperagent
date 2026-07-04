@@ -17,7 +17,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/amanjaiman/agentkeeper/internal/adapter"
+	"github.com/amanjaiman/sleeperagent/internal/adapter"
 	"golang.org/x/sys/windows"
 	"golang.org/x/term"
 )

@@ -14,7 +14,7 @@ import (
 
 func installCmd(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
-	dir := fs.String("dir", "", "directory to install agentkeeper into")
+	dir := fs.String("dir", "", "directory to install sleeperagent into")
 	force := fs.Bool("force", false, "overwrite an existing different file")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -44,14 +44,14 @@ func installCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("agentkeeper install: %s: %s\n", status, target)
+	fmt.Printf("sleeperagent install: %s: %s\n", status, target)
 	if pathContainsDir(os.Getenv("PATH"), targetDir, runtime.GOOS) {
-		fmt.Println("Open a new shell, then run: agentkeeper version")
+		fmt.Println("Open a new shell, then run: sleeperagent version")
 		return nil
 	}
-	fmt.Printf("agentkeeper install: %s is not on PATH yet.\n", targetDir)
+	fmt.Printf("sleeperagent install: %s is not on PATH yet.\n", targetDir)
 	fmt.Println(pathRemediation(targetDir, runtime.GOOS))
-	fmt.Println("Open a new shell after updating PATH, then run: agentkeeper version")
+	fmt.Println("Open a new shell after updating PATH, then run: sleeperagent version")
 	return nil
 }
 
@@ -71,9 +71,9 @@ func defaultInstallDir() (string, error) {
 
 func installName(goos string) string {
 	if goos == "windows" {
-		return "agentkeeper.exe"
+		return "sleeperagent.exe"
 	}
-	return "agentkeeper"
+	return "sleeperagent"
 }
 
 func installExecutable(src, target string, force bool) (string, error) {
@@ -117,7 +117,7 @@ func installExecutable(src, target string, force bool) (string, error) {
 	// sidelined copy is removed on the next install, once the old process exits.
 	if err := os.Rename(target, aside); err != nil {
 		_ = os.Remove(tmp)
-		return "", fmt.Errorf("replace %s (is it in use? close other agentkeeper processes or pass a fresh --dir): %w", target, err)
+		return "", fmt.Errorf("replace %s (is it in use? close other sleeperagent processes or pass a fresh --dir): %w", target, err)
 	}
 	if err := os.Rename(tmp, target); err != nil {
 		_ = os.Rename(aside, target) // restore the original on failure
