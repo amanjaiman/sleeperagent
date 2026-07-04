@@ -1,0 +1,22 @@
+ • I found an existing React/Vite/Three.js golf project at C:
+   \Users\amanj\Documents\golf-game. I'm going to ask the first set of high-
+   impact product/setup questions now.
+
+  Question 1/3 (3 unanswered)
+  Should this new golf game continue in the existing `golf-game` React/
+  Three.js project or start in a fresh folder?
+
+  › 1. Use existing (Recommended)   Builds on the current Vite, React,
+                                    Three, Rapier setup already present in
+                                    Documents.
+
+    2. Fresh folder                 Creates a clean new project and leaves
+                                    the existing March prototype untouched.
+
+    3. Inspect deeper first         Spend more planning time reviewing the
+                                    existing source before deciding.
+
+    4. None of the above            Optionally, add details in notes (tab).
+
+  tab to add notes | enter to submit answer | ←/→ to navigate questions
+  esc to interrupt

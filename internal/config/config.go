@@ -101,11 +101,29 @@ func Default() Config {
 			"codex": {
 				LaunchCmd: "codex",
 				ResumeCmd: "codex resume",
+				// Codex prints its limit banner wrapped across terminal lines, e.g.
+				// "...or try again\nat 2:10 PM." The first two patterns anchor on the
+				// definitive "hit your usage limit" banner (so a real cap is caught
+				// without tripping on Codex merely quoting the phrase in prose), and
+				// use \s+ — not a literal space — between "try again" and "at"/"in"
+				// so the wrap is tolerated. The generic fallbacks below likewise use
+				// \s+ to survive the same line wrap for other Codex phrasings.
 				LimitPatterns: []string{
-					`(?i)try again at (?P<time>.+)`,
-					`(?i)try again in (?P<dur>.+)`,
+					`(?is)hit your usage limit\b.*?try again\s+at\s+(?P<time>\d{1,2}(?::\d{2})?\s*[ap]m)`,
+					`(?is)hit your usage limit\b.*?try again\s+in\s+(?P<dur>[^\r\n.]+)`,
+					`(?i)try again\s+at\s+(?P<time>.+)`,
+					`(?i)try again\s+in\s+(?P<dur>.+)`,
 					`(?i)rate limit.*reset[a-z ]*in (?P<dur>.+)`,
 				},
+				// Codex's structured question UI: a "Question N/M" header, an
+				// arrow-navigable numbered option list with option 1 pre-highlighted
+				// ("› 1. …"), and a footer ending in "enter to submit answer". We
+				// anchor on the header + that footer so --auto-answer-prompts answers
+				// the agent's clarifying questions (bare Enter picks the highlighted
+				// first/recommended option) but deliberately does NOT match Codex's
+				// command-execution approval prompts, which must not be auto-approved
+				// unattended.
+				PromptPattern:  `(?is)Question\s+\d+\s*/\s*\d+\b.*?\benter\s+to\s+submit\s+answer\b`,
 				InjectStyle:    adapter.InjectTextEnter,
 				TranscriptGlob: "~/.codex/sessions/**/*.jsonl",
 				YoloFlag:       "--dangerously-bypass-approvals-and-sandbox",

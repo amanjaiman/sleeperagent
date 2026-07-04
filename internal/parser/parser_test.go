@@ -274,6 +274,40 @@ func TestDetectCodexFormats(t *testing.T) {
 	}
 }
 
+// The real Codex banner wraps across terminal lines, putting a newline between
+// "try again" and "at 2:10 PM." A literal-space pattern misses it and the
+// supervisor never leaves RUNNING; the configured patterns must tolerate the
+// wrap. This guards that regression against the actual default config patterns.
+func TestDetectCodexWrappedBanner(t *testing.T) {
+	codex, ok := config.Default().Agents["codex"]
+	if !ok {
+		t.Fatal("no codex adapter in default config")
+	}
+	var pats []*regexp.Regexp
+	for _, p := range codex.LimitPatterns {
+		pats = append(pats, regexp.MustCompile(p))
+	}
+
+	banner := "You've hit your usage limit. Upgrade to Pro\n" +
+		"(https://chatgpt.com/explore/pro), visit\n" +
+		"https://chatgpt.com/codex/settings/usage to purchase more credits or try again\n" +
+		"at 2:10 PM."
+
+	now := refNow(t, "10:00")
+	_, g, ok := Detect(pats, banner)
+	if !ok {
+		t.Fatal("wrapped Codex limit banner not detected")
+	}
+	ri := Resolve(g, now, fallbackWindowTest)
+	if ri.Source != SourceClock {
+		t.Fatalf("resolved via %s, want clock (groups=%v)", ri.Source, g)
+	}
+	want := refNow(t, "14:10")
+	if !ri.Time.Equal(want) {
+		t.Fatalf("reset time = %v, want %v", ri.Time, want)
+	}
+}
+
 const fallbackWindowTest = 5 * time.Hour
 
 func refNow(t *testing.T, hhmm string) time.Time {
