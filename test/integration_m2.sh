@@ -34,7 +34,13 @@ check "status shows RUNNING" '"$BIN" status | grep -q RUNNING'
 
 echo "== detach via command =="
 "$BIN" detach --name "$N1"
-sleep 5
+# Poll instead of a fixed sleep: detach goes through the control-file poller
+# (pollControl) plus the supervisor's own poll_interval, so a fixed duration
+# can race this on a loaded/CI runner. Ceiling is generous.
+for _ in $(seq 1 20); do
+  stopped "$SUP1" && break
+  sleep 0.5
+done
 check "supervisor exited after detach" 'stopped "$SUP1"'
 check "session still alive after detach" 'tmux has-session -t "$N1" 2>/dev/null'
 check "status now shows DETACHED" '"$BIN" status --name "$N1" | grep -q DETACHED'
@@ -44,7 +50,12 @@ echo "== stop --kill on a second instance =="
 SUP2=$!
 sleep 3
 "$BIN" stop --name "$N2" --kill
-sleep 5
+# Same rationale as the detach poll above: give the control-file poller and
+# supervisor poll_interval a generous, polled ceiling instead of a fixed sleep.
+for _ in $(seq 1 20); do
+  stopped "$SUP2" && break
+  sleep 0.5
+done
 check "supervisor-2 exited after kill" 'stopped "$SUP2"'
 check "session-2 terminated by kill" '! tmux has-session -t "$N2" 2>/dev/null'
 

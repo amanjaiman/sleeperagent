@@ -29,27 +29,44 @@ ATT=$!
 # anything about the supervisor's reaction — on a loaded/CI runner both the
 # `script` pty attach and the supervisor's next poll can lag noticeably past a
 # fixed sleep, which made this flaky. Poll instead of guessing a duration.
+#
+# Require the client to be seen on two consecutive checks (100ms apart) so a
+# transient/flapping attach (script reattaching, or a race in when the pty is
+# fully set up) doesn't get counted as "attached" before it has really settled.
 attached=0
-for _ in $(seq 1 20); do
+for _ in $(seq 1 40); do
   if [ -n "$(tmux list-clients -t "$N" 2>/dev/null)" ]; then
-    attached=1
-    break
+    sleep 0.1
+    if [ -n "$(tmux list-clients -t "$N" 2>/dev/null)" ]; then
+      attached=1
+      break
+    fi
   fi
   sleep 0.5
 done
 if [ "$attached" -ne 1 ]; then
-  echo "  FAIL: tmux never saw an attached client (script/tmux attach didn't take)"
+  echo "  FAIL: tmux never saw a sustained attached client (script/tmux attach didn't take)"
   echo "---- script log ----"; cat /tmp/ak_auto_script.log
+  echo "---- tmux list-clients (final) ----"; tmux list-clients -t "$N" 2>&1
   fail=1
 fi
 
-# Give the supervisor a few poll cycles to notice and detach.
-for _ in $(seq 1 20); do
+# Give the supervisor several poll cycles (default poll_interval is 3s; budget
+# a generous multiple of that plus process/IO overhead on a loaded runner)
+# to notice and detach.
+detached=0
+for _ in $(seq 1 60); do
   if ! kill -0 "$SUP" 2>/dev/null; then
+    detached=1
     break
   fi
   sleep 0.5
 done
+if [ "$detached" -ne 1 ]; then
+  echo "  FAIL: supervisor (pid $SUP) never exited after 30s of polling"
+  echo "---- ps of supervisor tree ----"; ps -ef 2>/dev/null | grep -i sleeperagent
+  echo "---- tmux list-clients (final) ----"; tmux list-clients -t "$N" 2>&1
+fi
 
 check "supervisor auto-detached" '! kill -0 "$SUP" 2>/dev/null'
 check "session still alive (handed to user)" 'tmux has-session -t "$N" 2>/dev/null'

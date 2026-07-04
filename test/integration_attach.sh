@@ -43,7 +43,29 @@ sleep 2
 echo "== attach-existing (normal) on the same live session SHOULD inject =="
 "$BIN" attach-existing --agent fake --target "$SESSION" --config "$CFG" --no-notify --prompt real-prompt >/tmp/ak_inj.log 2>&1 &
 INJ=$!
-sleep 7
+
+# The fake agent emits its limit line ~1s after start with a reset ~6s later,
+# and poll_interval here is 1s (see $CFG above), so the supervisor needs at
+# least a few poll cycles after the reset to notice, wait out the buffer, and
+# inject. A fixed `sleep 7` raced this tightly on a loaded/CI runner (the
+# prompt sometimes hadn't landed yet), so poll for the marker instead of
+# guessing a duration — matching the pattern in integration_m2_autodetach.sh.
+injected=0
+for _ in $(seq 1 60); do
+  if grep -q "real-prompt" "$MARKER" 2>/dev/null; then
+    injected=1
+    break
+  fi
+  if ! kill -0 "$INJ" 2>/dev/null; then
+    # process exited early (e.g. crashed) — no point polling further
+    break
+  fi
+  sleep 0.5
+done
+if [ "$injected" -ne 1 ]; then
+  echo "  FAIL: resume prompt not seen in marker after 30s of polling"
+fi
+
 kill "$INJ" 2>/dev/null; wait "$INJ" 2>/dev/null
 check "normal attach injected the resume prompt" 'grep -q "real-prompt" "$MARKER" 2>/dev/null'
 
