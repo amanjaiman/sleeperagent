@@ -1,11 +1,29 @@
-# SleeperAgent
+<h1 align="center">SleeperAgent</h1>
 
-[![CI](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/amanjaiman/sleeperagent)](https://github.com/amanjaiman/sleeperagent/releases)
-[![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg)](https://pkg.go.dev/github.com/amanjaiman/sleeperagent)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml"
+    ><img
+      alt="CI"
+      src="https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg"
+  /></a>
+  <a href="https://github.com/amanjaiman/sleeperagent/releases"
+    ><img
+      alt="Release"
+      src="https://img.shields.io/github/v/release/amanjaiman/sleeperagent"
+  /></a>
+  <a href="https://pkg.go.dev/github.com/amanjaiman/sleeperagent"
+    ><img
+      alt="Go Reference"
+      src="https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg"
+  /></a>
+  <a href="LICENSE"
+    ><img
+      alt="License: MIT"
+      src="https://img.shields.io/badge/License-MIT-yellow.svg"
+  /></a>
+</p>
 
-**A cross-agent watchdog that resumes Claude Code / Codex sessions when their usage limits reset — and gets out of your way the moment you want to take over.**
+<h3 align="center">Your usage limit resets. Your agent automatically continues.</h3>
 
 When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. SleeperAgent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
 
@@ -22,7 +40,7 @@ When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you 
 - **Cross-platform** — native on **Linux, macOS, and Windows** (no WSL required).
 - **Graceful handoff** — hotkeys, `detach`/`stop`, auto-detach when you attach, Ctrl-C that detaches rather than kills.
 - **Local-LLM reprompt** *(optional)* — a local Ollama model writes a context-aware continuation instruction from the transcript + git diff, validated before use. Falls back to a static prompt on any doubt.
-- **Operable & safe** — background `--daemon` mode, `status`, desktop + webhook notifications, a `parse` command to tune patterns, and unattended tool-calls **off by default**.
+- **Operable & safe** — `status`, desktop + webhook notifications, a `parse` command to tune patterns, and unattended tool-calls **off by default**.
 
 See [docs/SPEC.md](docs/SPEC.md) for the full design rationale.
 
@@ -79,6 +97,13 @@ sleeperagent run --agent claude --name mytask
 
 ---
 
+## Ways to use it
+
+- **`sleeperagent run`** — the default. Launches the agent, watches it in your terminal, detaches with a hotkey, and takes over the moment you're back. Check on it from any other shell with `sleeperagent status`.
+- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux and want SleeperAgent to pick up watching it without restarting anything.
+
+---
+
 ## Commands
 
 | Command | Description |
@@ -104,12 +129,9 @@ sleeperagent run --agent claude --name mytask
 | `--prompt` | Static resume prompt to inject on reset. |
 | `--reprompt` | Local-LLM reprompt, e.g. `ollama:llama3.1` (falls back to static). |
 | `--backend` | `tmux` (default on Unix) or `pty` (default on Windows). |
-| `--daemon` | Run in the background; control via `status`/`detach`/`stop`. |
-| `--watch-only` | Notify at the reset but **do not** auto-inject — you resume by hand. |
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
-| `--auto-answer-prompts` | Answer interactive prompts with the first/default option (**DANGEROUS** — unattended approvals). |
+| `--auto-answer-prompts` | Answer interactive prompts with the first/default option so the run doesn't stall while you're away (**default: on**; pass `=false` to disable). |
 | `--webhook` | POST notifications to this URL as JSON. |
-| `--no-auto-detach` | Don't auto-detach when you attach to the session. |
 | `--no-notify` | Disable desktop notifications. |
 | `--config` | Path to `config.toml` (default: OS config dir). |
 
@@ -122,12 +144,8 @@ sleeperagent run --agent codex --prompt "Continue; run the tests after."
 # Let a local model write the continuation instruction each reset
 sleeperagent run --agent claude --reprompt ollama:llama3.1
 
-# Run in the background and check on it later (works on all platforms)
-sleeperagent run --agent claude --name nightly --daemon
+# Check on a running instance from another shell
 sleeperagent status
-
-# Just nudge me at the reset — don't auto-resume
-sleeperagent run --agent claude --watch-only
 
 # Custom launch command — same Claude adapter, but your own flags / wrapper / binary
 sleeperagent run --agent claude -- claude --model opus --add-dir ../shared-lib
@@ -153,10 +171,10 @@ SleeperAgent is built to get out of your way. How handoff works depends on the b
 - **Hotkeys** (foreground run): `d`/`q` detach, `k` kills the session (with a `y` confirm).
 - **`sleeperagent detach --name X`** from any other shell.
 - **Ctrl-C** detaches — it never kills the session.
-- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type (disable with `--no-auto-detach`).
+- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
 
-**pty / ConPTY backend (default on Windows, optional on Unix):** the agent is a child of the supervisor, so it **can't be handed back interactively**. In the foreground, `detach` gives the terminal back to you until the agent exits; in `--daemon` mode, `detach`/`stop` ends the agent. Use the tmux backend if you need full handoff.
+**pty / ConPTY backend (default on Windows, optional on Unix):** the agent is a child of the supervisor, so it **can't be handed back interactively**. `detach` gives the terminal back to you until the agent exits. Use the tmux backend if you need full handoff.
 
 ---
 
@@ -198,7 +216,7 @@ Desktop notifications are on by default (best effort; `--no-notify` to disable) 
 
 SleeperAgent **waits for legitimate resets**; it does not bypass limits.
 
-Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. `--auto-answer-prompts` is a separate loud opt-in that leaves prompts enabled but answers detected interactive prompts with their first/default option, which may approve tool calls. Prefer to stay in the loop? `--watch-only` notifies you at the reset and lets you resume by hand. LLM-generated prompts are length-capped and denylist-checked before injection.
+Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit opt-in via `--yolo`, which bypasses permission prompts entirely; use it only when you understand the risk. Separately, **`--auto-answer-prompts` defaults to on**: it doesn't remove any prompts, but if one comes up while you're away, it answers with the first/default option — including ones that approve tool calls — rather than letting the run stall. Choosing to run an agent unattended already means accepting it can act without you each cycle; pass `--auto-answer-prompts=false` if you'd rather it stall on unexpected prompts instead. LLM-generated prompts are length-capped and denylist-checked before injection.
 
 ## How it works
 
