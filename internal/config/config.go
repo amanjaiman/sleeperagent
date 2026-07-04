@@ -115,6 +115,15 @@ func Default() Config {
 					`(?i)try again\s+in\s+(?P<dur>.+)`,
 					`(?i)rate limit.*reset[a-z ]*in (?P<dur>.+)`,
 				},
+				// Codex's structured question UI: a "Question N/M" header, an
+				// arrow-navigable numbered option list with option 1 pre-highlighted
+				// ("› 1. …"), and a footer ending in "enter to submit answer". We
+				// anchor on the header + that footer so --auto-answer-prompts answers
+				// the agent's clarifying questions (bare Enter picks the highlighted
+				// first/recommended option) but deliberately does NOT match Codex's
+				// command-execution approval prompts, which must not be auto-approved
+				// unattended.
+				PromptPattern:  `(?is)Question\s+\d+\s*/\s*\d+\b.*?\benter\s+to\s+submit\s+answer\b`,
 				InjectStyle:    adapter.InjectTextEnter,
 				TranscriptGlob: "~/.codex/sessions/**/*.jsonl",
 				YoloFlag:       "--dangerously-bypass-approvals-and-sandbox",

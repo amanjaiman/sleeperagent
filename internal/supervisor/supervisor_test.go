@@ -594,6 +594,45 @@ func TestAutoAnswerPromptsAnswersCapturedSelectionPromptOnce(t *testing.T) {
 	}
 }
 
+// TestAutoAnswerPromptsAnswersCodexQuestionPrompt drives the real captured Codex
+// "Question N/M" prompt (option 1 pre-highlighted, footer "enter to submit
+// answer") through the default codex adapter. The correct keystroke is a bare
+// Enter, which submits the highlighted first/recommended option — not "1\r",
+// since Codex navigates with arrows rather than digit keys.
+func TestAutoAnswerPromptsAnswersCodexQuestionPrompt(t *testing.T) {
+	menu := readParserTestdata(t, "codex", "questions-prompt.txt")
+	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
+	ad, err := config.Default().Adapter("codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pane := &fakePane{screen: menu}
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		Now: clk.now, AutoAnswerPrompts: true,
+	})
+
+	must(t, sup.tick()) // prompt just rendered; not idle yet
+	if len(pane.injected) != 0 {
+		t.Fatalf("must not answer before idle, got %q", pane.injected)
+	}
+	clk.add(3 * time.Second)
+	must(t, sup.tick())
+	if len(pane.injected) != 1 || pane.injected[0] != "\r" {
+		t.Fatalf("codex question auto-answer injected = %q, want one bare Enter %q", pane.injected, "\\r")
+	}
+	if pane.styles[0] != adapter.InjectKeys {
+		t.Fatalf("style = %q, want %q", pane.styles[0], adapter.InjectKeys)
+	}
+	// The same prompt lingering must not be answered twice.
+	clk.add(3 * time.Second)
+	must(t, sup.tick())
+	if len(pane.injected) != 1 {
+		t.Fatalf("lingering codex prompt answered more than once: %q", pane.injected)
+	}
+}
+
 func TestAutoAnswerPromptsAnswersCapturedYesNoPrompt(t *testing.T) {
 	menu := readParserTestdata(t, "claude", "workspace-trust-prompt.txt")
 	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
