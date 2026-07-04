@@ -217,8 +217,8 @@ Make the pty/ConPTY backend behave as if the user had run the agent directly,
 with SleeperAgent watching silently in the background:
 
 1. **Supervisor logs go to the per-instance logfile, not the TTY**, whenever the
-   backend is echoing the agent to that same TTY. Reuse the daemon logfile path
-   (`<state-dir>/<instance>.log`, [main.go:414](../cmd/sleeperagent/main.go)).
+   backend is echoing the agent to that same TTY. Reuse the per-instance logfile
+   path (`<state-dir>/<instance>.log`, [main.go:414](../cmd/sleeperagent/main.go)).
    The TTY shows **only the agent**.
 2. **State transitions surface out-of-band**, not as inline log spam:
    desktop/webhook notifications (already wired,

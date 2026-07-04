@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -101,13 +100,9 @@ Run flags:
   --backend  string  session backend: "tmux" (default) or "pty" (no-tmux fallback)
   --webhook  string  POST notifications to this URL
   --config   string  path to config.toml (default: OS config dir)
-  --daemon           run in the background; control via status/detach/stop
-                     (tmux backend keeps full handoff; pty backend ends on detach)
-  --watch-only       notify at reset but do NOT auto-inject
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
   --auto-answer-prompts
                      answer interactive prompts with the first/default option (DANGEROUS)
-  --no-auto-detach   do NOT auto-detach when you attach to the session
   --no-notify        disable desktop notifications
 
 The trailing "-- launch-command..." is optional: omit it to use the adapter's
@@ -130,15 +125,12 @@ func runCmd(args []string) error {
 	name := fs.String("name", "", "instance / tmux session name")
 	promptText := fs.String("prompt", "", "static resume prompt")
 	cfgPath := fs.String("config", "", "path to config.toml")
-	noAutoDetach := fs.Bool("no-auto-detach", false, "do not auto-detach on user activity")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	backend := fs.String("backend", defaultBackend(), `session backend: "tmux" or "pty"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
-	watchOnly := fs.Bool("watch-only", false, "notify at reset but do NOT auto-inject")
 	yolo := fs.Bool("yolo", false, "append the agent's skip-permissions flag (DANGEROUS)")
 	autoAnswerPrompts := fs.Bool("auto-answer-prompts", false, "answer interactive prompts with the first/default option (DANGEROUS)")
-	daemon := fs.Bool("daemon", false, "run in the background; control via status/detach/stop")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -170,22 +162,6 @@ func runCmd(args []string) error {
 	instance := *name
 	if instance == "" {
 		instance = "sleeperagent-" + *agent
-	}
-
-	// Background mode: re-exec ourselves detached from the terminal and return.
-	// The child (marked by the env var) skips this branch and runs normally,
-	// logging to a file. Control is then purely via status/detach/stop.
-	if *daemon && os.Getenv(daemonEnv) == "" {
-		switch *backend {
-		case "tmux":
-			// full handoff: the session survives the supervisor
-		case "pty":
-			fmt.Println("note: --daemon with the pty backend — the agent is bound to the supervisor, " +
-				"so detach/stop ends it (no reattach). Use the tmux backend for full handoff.")
-		default:
-			return fmt.Errorf("unknown backend %q (use \"tmux\" or \"pty\")", *backend)
-		}
-		return daemonize(instance, args)
 	}
 
 	cwd, _ := os.Getwd()
@@ -268,8 +244,6 @@ func runCmd(args []string) error {
 		resumeText:        resumeText,
 		cfg:               cfg,
 		cwd:               cwd,
-		autoDetach:        !*noAutoDetach,
-		watchOnly:         *watchOnly,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 		transparentTTY:    *backend == "pty",
@@ -292,8 +266,6 @@ type watchParams struct {
 	resumeText        string
 	cfg               config.Config
 	cwd               string
-	autoDetach        bool
-	watchOnly         bool
 	autoAnswerPrompts bool
 	notifier          notify.Notifier
 	transparentTTY    bool
@@ -313,9 +285,6 @@ func watchSession(p watchParams) error {
 		go p.foreground(ctx)
 	}
 	log.Printf("watching. take over any time with: %s", p.attachHint)
-	if p.watchOnly {
-		log.Printf("watch-only: will notify at reset but NOT auto-inject")
-	}
 	if p.autoAnswerPrompts {
 		log.Printf("auto-answer-prompts: enabled; interactive prompts may be accepted without a human")
 	}
@@ -373,8 +342,6 @@ func watchSession(p watchParams) error {
 		ResetBuffer:       p.cfg.ResetBuffer.D(),
 		MaxWait:           p.cfg.MaxWait.D(),
 		Cwd:               p.cwd,
-		AutoDetach:        p.autoDetach,
-		WatchOnly:         p.watchOnly,
 		AutoAnswerPrompts: p.autoAnswerPrompts,
 		Commands:          cmds,
 		OnUpdate:          writeRecord,
@@ -453,52 +420,6 @@ func defaultBackend() string {
 	return "tmux"
 }
 
-// daemonEnv marks a re-executed background child so it does not re-daemonize.
-const daemonEnv = "SLEEPERAGENT_DAEMONIZED"
-
-// daemonize re-executes sleeperagent detached from the controlling terminal, with
-// stdout/stderr redirected to a per-instance log file, and returns immediately.
-// The child runs the same `run` command with daemonEnv set. The detach mechanism
-// is platform-specific (see detach_unix.go / detach_windows.go), so this works on
-// Linux, macOS, and Windows.
-func daemonize(instance string, runArgs []string) error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	logPath := instanceLogPath(instance)
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return err
-	}
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	defer logFile.Close()
-
-	cmd := exec.Command(exe, append([]string{"run"}, runArgs...)...)
-	cmd.Env = append(os.Environ(), daemonEnv+"=1")
-	cmd.Stdin = nil
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	cmd.SysProcAttr = daemonSysProcAttr()
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start background process: %w", err)
-	}
-	pid := cmd.Process.Pid
-	_ = cmd.Process.Release() // detach; do not wait
-
-	// Write an initial record so `status` works immediately; the child (same PID)
-	// overwrites it with full detail once it starts watching.
-	_ = statefile.Write(statefile.Record{Name: instance, State: "RUNNING", PID: pid})
-
-	fmt.Printf("sleeperagent: %q started in background (pid %d)\n", instance, pid)
-	fmt.Printf("  logs:   sleeperagent logs --name %s --follow   (file: %s)\n", instance, logPath)
-	fmt.Printf("  status: sleeperagent status --name %s\n", instance)
-	fmt.Printf("  stop:   sleeperagent detach --name %s   (or: stop --name %s --kill)\n", instance, instance)
-	return nil
-}
-
 func redirectLogsToInstanceFile(instance string) (func(), error) {
 	logPath := instanceLogPath(instance)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
@@ -526,11 +447,9 @@ func attachExistingCmd(args []string) error {
 	target := fs.String("target", "", "tmux target to watch, e.g. mywork:0.1 (required)")
 	promptText := fs.String("prompt", "", "static resume prompt")
 	cfgPath := fs.String("config", "", "path to config.toml")
-	noAutoDetach := fs.Bool("no-auto-detach", false, "do not auto-detach on user activity")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
-	watchOnly := fs.Bool("watch-only", false, "notify at reset but do NOT auto-inject")
 	autoAnswerPrompts := fs.Bool("auto-answer-prompts", false, "answer interactive prompts with the first/default option (DANGEROUS)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -589,8 +508,6 @@ func attachExistingCmd(args []string) error {
 		resumeText:        resumeText,
 		cfg:               cfg,
 		cwd:               cwd,
-		autoDetach:        !*noAutoDetach,
-		watchOnly:         *watchOnly,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 	})
@@ -674,7 +591,6 @@ func agentsCmd(args []string) error {
 		}
 		fmt.Printf("%s  [%s]\n", name, status)
 		fmt.Printf("    launch : %s\n", ac.LaunchCmd)
-		fmt.Printf("    resume : %s\n", ac.ResumeCmd)
 		fmt.Printf("    inject : %s\n", injectStyleOrDefault(ac.InjectStyle))
 		for _, p := range ac.LimitPatterns {
 			fmt.Printf("    limit  : %s\n", p)

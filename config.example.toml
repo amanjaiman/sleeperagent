@@ -9,7 +9,6 @@ max_wait      = "24h"  # cap on a single wait; longer (weekly cap) -> notify + d
 
 [agents.claude]
 launch_cmd      = "claude"
-resume_cmd      = "claude -c"
 # Patterns are Go regexes. Use named groups: (?P<time>...) for a clock time,
 # (?P<ts>...) for a unix timestamp. The limit/idle strings are undocumented and
 # can change on agent updates — fix them here, no reinstall needed.
@@ -37,7 +36,6 @@ once    = true
 
 [agents.codex]
 launch_cmd     = "codex"
-resume_cmd     = "codex resume"
 # (?P<time>...) clock time, (?P<dur>...) relative duration ("in 2h30m" / "in 45 minutes").
 limit_patterns = [
   "(?i)try again at (?P<time>.+)",

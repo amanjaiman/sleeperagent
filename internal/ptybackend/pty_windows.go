@@ -148,7 +148,7 @@ func (c *Client) Start(command string) error {
 }
 
 // consoleSize reports the current terminal size, falling back to a sane default
-// when stdout isn't a terminal (e.g. running under --daemon).
+// when stdout isn't a terminal.
 func consoleSize() (int16, int16) {
 	w, h := int16(120), int16(30)
 	if term.IsTerminal(int(os.Stdout.Fd())) {

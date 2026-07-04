@@ -20,17 +20,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Polish (M5)** — `--backend pty` no-tmux fallback (Unix), desktop + `--webhook`
   notifications, progressive re-limit backoff.
 - **Operability** — `attach-existing` (watch/recover a running session),
-  `--watch-only` (notify but don't inject), `--yolo` (explicit unattended opt-in),
-  `parse` (test limit strings against patterns), and a `version` command.
-- **Background mode** — `run --daemon` re-executes detached from the terminal, logs
-  to `<state-dir>/<name>.log`, and is controlled entirely via `status` / `detach` /
-  `stop`. Works with both backends: the tmux backend keeps full handoff; the pty
-  backend (incl. Windows ConPTY) runs headless and ends on detach. Cross-platform
-  detach (setsid on Unix, detached process group on Windows).
+  `--yolo` (explicit unattended opt-in), `parse` (test limit strings against
+  patterns), and a `version` command.
 - **Native Windows support** — a ConPTY-based `pty` backend (the default on
   Windows) runs a native Windows agent in a pseudoconsole, so SleeperAgent works on
-  Windows with no WSL, including `--daemon`. Linux/macOS/Windows are all
-  first-class.
+  Windows with no WSL. Linux/macOS/Windows are all first-class.
 - **Dead-session detection** — the supervisor now stops cleanly (new `ENDED`
   state + notification) when the agent exits or the tmux session is killed out
   from under it, instead of looping forever on `capture failed`. Consecutive
