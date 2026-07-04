@@ -101,9 +101,18 @@ func Default() Config {
 			"codex": {
 				LaunchCmd: "codex",
 				ResumeCmd: "codex resume",
+				// Codex prints its limit banner wrapped across terminal lines, e.g.
+				// "...or try again\nat 2:10 PM." The first two patterns anchor on the
+				// definitive "hit your usage limit" banner (so a real cap is caught
+				// without tripping on Codex merely quoting the phrase in prose), and
+				// use \s+ — not a literal space — between "try again" and "at"/"in"
+				// so the wrap is tolerated. The generic fallbacks below likewise use
+				// \s+ to survive the same line wrap for other Codex phrasings.
 				LimitPatterns: []string{
-					`(?i)try again at (?P<time>.+)`,
-					`(?i)try again in (?P<dur>.+)`,
+					`(?is)hit your usage limit\b.*?try again\s+at\s+(?P<time>\d{1,2}(?::\d{2})?\s*[ap]m)`,
+					`(?is)hit your usage limit\b.*?try again\s+in\s+(?P<dur>[^\r\n.]+)`,
+					`(?i)try again\s+at\s+(?P<time>.+)`,
+					`(?i)try again\s+in\s+(?P<dur>.+)`,
 					`(?i)rate limit.*reset[a-z ]*in (?P<dur>.+)`,
 				},
 				InjectStyle:    adapter.InjectTextEnter,
