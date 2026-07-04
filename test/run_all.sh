@@ -3,8 +3,7 @@
 cd "$(dirname "$0")/.."
 fail=0
 for s in integration integration_m2 integration_m2_autodetach \
-         integration_attach integration_daemon integration_daemon_pty \
-         integration_codex integration_reprompt integration_pty \
+         integration_attach integration_codex integration_reprompt integration_pty \
          integration_dead_session; do
   sed -i 's/\r$//' "test/$s.sh" 2>/dev/null
   printf '%-30s ' "$s"

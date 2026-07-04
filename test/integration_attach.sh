@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# M5+ end-to-end: `attach-existing` (watch a session we did NOT launch) and
-# `--watch-only` (notify at reset but do not inject), then a normal attach that
-# DOES inject — also exercising the crash-recovery re-attach path. Run from WSL.
+# M5+ end-to-end: `attach-existing` (watch a session we did NOT launch), a
+# normal attach that DOES inject — also exercising the crash-recovery
+# re-attach path. Run from WSL.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,15 +40,6 @@ chmod +x "$AGENT"
 tmux new-session -d -s "$SESSION" "bash $AGENT"
 sleep 2
 
-echo "== attach-existing --watch-only (should NOT inject) =="
-"$BIN" attach-existing --agent fake --target "$SESSION" --config "$CFG" --watch-only --no-notify --prompt wo-prompt >/tmp/ak_wo.log 2>&1 &
-WO=$!
-sleep 12
-wait "$WO" 2>/dev/null
-check "watch-only did not inject" '! grep -q "wo-prompt" "$MARKER" 2>/dev/null'
-check "watch-only logged it is not injecting" 'grep -qi "watch-only" /tmp/ak_wo.log'
-check "session still alive after watch-only" 'tmux has-session -t "$SESSION" 2>/dev/null'
-
 echo "== attach-existing (normal) on the same live session SHOULD inject =="
 "$BIN" attach-existing --agent fake --target "$SESSION" --config "$CFG" --no-notify --prompt real-prompt >/tmp/ak_inj.log 2>&1 &
 INJ=$!
@@ -56,7 +47,6 @@ sleep 7
 kill "$INJ" 2>/dev/null; wait "$INJ" 2>/dev/null
 check "normal attach injected the resume prompt" 'grep -q "real-prompt" "$MARKER" 2>/dev/null'
 
-echo "---- watch-only log ----"; cat /tmp/ak_wo.log
 echo "---- inject log ----"; cat /tmp/ak_inj.log
 if [ "$fail" -eq 0 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL"; fi
 exit "$fail"

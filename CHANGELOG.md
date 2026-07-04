@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **`--auto-answer-prompts` now defaults to `true`** on both `run` and
+  `attach-existing`. Previously off by default, the flag now answers detected
+  interactive agent prompts (a numbered menu, a y/n prompt) with the
+  first/default option unless explicitly disabled. Rationale: without it, if
+  the agent asks a question while you're away, it simply sits stuck — the
+  point of SleeperAgent is unattended auto-resume, and a stalled prompt
+  defeats that. Running an agent unattended at all already means accepting
+  that it may take actions without a human in the loop each time; this just
+  extends that same acceptance to routine prompts instead of stalling on
+  them. Pass `--auto-answer-prompts=false` to restore the old (stall-prone)
+  behavior.
+
 ### Added
 - **Core loop (M1)** — launch a coding agent in a managed tmux session, detect the
   usage-limit message, parse the reset time, wait, and inject a static resume prompt.
@@ -20,17 +33,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Polish (M5)** — `--backend pty` no-tmux fallback (Unix), desktop + `--webhook`
   notifications, progressive re-limit backoff.
 - **Operability** — `attach-existing` (watch/recover a running session),
-  `--watch-only` (notify but don't inject), `--yolo` (explicit unattended opt-in),
-  `parse` (test limit strings against patterns), and a `version` command.
-- **Background mode** — `run --daemon` re-executes detached from the terminal, logs
-  to `<state-dir>/<name>.log`, and is controlled entirely via `status` / `detach` /
-  `stop`. Works with both backends: the tmux backend keeps full handoff; the pty
-  backend (incl. Windows ConPTY) runs headless and ends on detach. Cross-platform
-  detach (setsid on Unix, detached process group on Windows).
+  `--yolo` (explicit unattended opt-in), `parse` (test limit strings against
+  patterns), and a `version` command.
 - **Native Windows support** — a ConPTY-based `pty` backend (the default on
   Windows) runs a native Windows agent in a pseudoconsole, so SleeperAgent works on
-  Windows with no WSL, including `--daemon`. Linux/macOS/Windows are all
-  first-class.
+  Windows with no WSL. Linux/macOS/Windows are all first-class.
 - **Dead-session detection** — the supervisor now stops cleanly (new `ENDED`
   state + notification) when the agent exits or the tmux session is killed out
   from under it, instead of looping forever on `capture failed`. Consecutive

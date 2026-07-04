@@ -31,7 +31,6 @@ const (
 type Adapter struct {
 	Name           string
 	LaunchCmd      string
-	ResumeCmd      string
 	LimitPatterns  []*regexp.Regexp
 	IdlePattern    *regexp.Regexp // may be nil; nil => fall back to stability heuristic
 	PromptPattern  *regexp.Regexp // may be nil; nil => generic prompt auto-answer unavailable
@@ -49,7 +48,6 @@ type Adapter struct {
 // Spec is the raw, un-compiled form of an adapter as it appears in config.
 type Spec struct {
 	LaunchCmd      string
-	ResumeCmd      string
 	LimitPatterns  []string
 	IdlePattern    string
 	PromptPattern  string
@@ -81,7 +79,6 @@ func Compile(name string, s Spec) (*Adapter, error) {
 	a := &Adapter{
 		Name:           name,
 		LaunchCmd:      s.LaunchCmd,
-		ResumeCmd:      s.ResumeCmd,
 		InjectStyle:    s.InjectStyle,
 		TranscriptGlob: s.TranscriptGlob,
 		YoloFlag:       s.YoloFlag,

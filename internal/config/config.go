@@ -32,7 +32,6 @@ func (d Duration) D() time.Duration { return time.Duration(d) }
 // AgentConfig is the raw adapter config for one agent.
 type AgentConfig struct {
 	LaunchCmd      string               `toml:"launch_cmd"`
-	ResumeCmd      string               `toml:"resume_cmd"`
 	LimitPatterns  []string             `toml:"limit_patterns"`
 	IdlePattern    string               `toml:"idle_pattern"`
 	PromptPattern  string               `toml:"prompt_pattern"`
@@ -77,7 +76,6 @@ func Default() Config {
 		Agents: map[string]AgentConfig{
 			"claude": {
 				LaunchCmd: "claude",
-				ResumeCmd: "claude -c",
 				LimitPatterns: []string{
 					`(?i)Claude AI usage limit reached\|(?P<ts>\d+)`,
 					`(?i)limit.*?reset[s]?\s+in\s+(?P<dur>[^\r\n.]+)`,
@@ -100,7 +98,6 @@ func Default() Config {
 			},
 			"codex": {
 				LaunchCmd: "codex",
-				ResumeCmd: "codex resume",
 				// Codex prints its limit banner wrapped across terminal lines, e.g.
 				// "...or try again\nat 2:10 PM." The first two patterns anchor on the
 				// definitive "hit your usage limit" banner (so a real cap is caught
@@ -214,7 +211,6 @@ func (c Config) Adapter(name string) (*adapter.Adapter, error) {
 	}
 	return adapter.Compile(name, adapter.Spec{
 		LaunchCmd:      ac.LaunchCmd,
-		ResumeCmd:      ac.ResumeCmd,
 		LimitPatterns:  ac.LimitPatterns,
 		IdlePattern:    ac.IdlePattern,
 		PromptPattern:  ac.PromptPattern,
