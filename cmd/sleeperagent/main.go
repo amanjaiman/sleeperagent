@@ -103,7 +103,8 @@ Run flags:
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
   --auto-answer-prompts
                      answer interactive prompts with the first/default option
-                     (DANGEROUS; default true — pass --auto-answer-prompts=false to disable)
+                     so the run doesn't stall while you're away (default true
+                     — pass --auto-answer-prompts=false to disable)
   --no-notify        disable desktop notifications
 
 The trailing "-- launch-command..." is optional: omit it to use the adapter's
@@ -131,7 +132,7 @@ func runCmd(args []string) error {
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
 	yolo := fs.Bool("yolo", false, "append the agent's skip-permissions flag (DANGEROUS)")
-	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option so the run does not stall while you're away (default true, pass =false to disable)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func runCmd(args []string) error {
 		log.Printf("⚠ --yolo: launching with %q — tool calls will run UNATTENDED with no permission prompts", ad.YoloFlag)
 	}
 	if *autoAnswerPrompts {
-		log.Printf("⚠ auto-answer-prompts is on by default: arbitrary interactive prompts may be answered UNATTENDED with their first/default option, including prompts that approve tool calls. Pass --auto-answer-prompts=false to disable.")
+		log.Printf("auto-answer-prompts is on by default: interactive prompts will be answered with their first/default option, including ones that approve tool calls, so the run does not stall while you're away. Pass --auto-answer-prompts=false to disable.")
 	}
 
 	instance := *name
@@ -451,7 +452,7 @@ func attachExistingCmd(args []string) error {
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
-	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option so the run does not stall while you're away (default true, pass =false to disable)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -468,7 +469,7 @@ func attachExistingCmd(args []string) error {
 		return err
 	}
 	if *autoAnswerPrompts {
-		log.Printf("⚠ auto-answer-prompts is on by default: arbitrary interactive prompts may be answered UNATTENDED with their first/default option, including prompts that approve tool calls. Pass --auto-answer-prompts=false to disable.")
+		log.Printf("auto-answer-prompts is on by default: interactive prompts will be answered with their first/default option, including ones that approve tool calls, so the run does not stall while you're away. Pass --auto-answer-prompts=false to disable.")
 	}
 	instance := *name
 	if instance == "" {

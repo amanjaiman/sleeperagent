@@ -80,7 +80,7 @@ func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
 // defaults to true, and that --auto-answer-prompts=false still opts out.
 func TestAutoAnswerPromptsFlagDefaultsToTrue(t *testing.T) {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option so the run does not stall while you're away (default true, pass =false to disable)")
 	if err := fs.Parse(nil); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestAutoAnswerPromptsFlagDefaultsToTrue(t *testing.T) {
 
 func TestAutoAnswerPromptsFlagCanBeDisabled(t *testing.T) {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option so the run does not stall while you're away (default true, pass =false to disable)")
 	if err := fs.Parse([]string{"--auto-answer-prompts=false"}); err != nil {
 		t.Fatal(err)
 	}

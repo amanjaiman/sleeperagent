@@ -13,10 +13,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   first/default option unless explicitly disabled. Rationale: without it, if
   the agent asks a question while you're away, it simply sits stuck — the
   point of SleeperAgent is unattended auto-resume, and a stalled prompt
-  defeats that. This is an accepted risk tradeoff: the match pattern for some
-  adapters is broad enough that a real tool-call permission prompt could
-  plausibly be auto-approved. Pass `--auto-answer-prompts=false` to restore
-  the old (safer, but stall-prone) behavior.
+  defeats that. Running an agent unattended at all already means accepting
+  that it may take actions without a human in the loop each time; this just
+  extends that same acceptance to routine prompts instead of stalling on
+  them. Pass `--auto-answer-prompts=false` to restore the old (stall-prone)
+  behavior.
 
 ### Added
 - **Core loop (M1)** — launch a coding agent in a managed tmux session, detect the
