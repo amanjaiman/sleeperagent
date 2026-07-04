@@ -107,7 +107,7 @@ sleeperagent run --agent claude --name mytask
 | `--daemon` | Run in the background; control via `status`/`detach`/`stop`. |
 | `--watch-only` | Notify at the reset but **do not** auto-inject — you resume by hand. |
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
-| `--auto-answer-prompts` | Answer interactive prompts with the first/default option (**DANGEROUS** — unattended approvals). |
+| `--auto-answer-prompts` | Answer interactive prompts with the first/default option (**default: on** — **DANGEROUS**, unattended approvals; pass `--auto-answer-prompts=false` to disable). |
 | `--webhook` | POST notifications to this URL as JSON. |
 | `--no-auto-detach` | Don't auto-detach when you attach to the session. |
 | `--no-notify` | Disable desktop notifications. |
@@ -198,7 +198,7 @@ Desktop notifications are on by default (best effort; `--no-notify` to disable) 
 
 SleeperAgent **waits for legitimate resets**; it does not bypass limits.
 
-Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. `--auto-answer-prompts` is a separate loud opt-in that leaves prompts enabled but answers detected interactive prompts with their first/default option, which may approve tool calls. Prefer to stay in the loop? `--watch-only` notifies you at the reset and lets you resume by hand. LLM-generated prompts are length-capped and denylist-checked before injection.
+Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. Separately, **`--auto-answer-prompts` defaults to `true`**: whenever SleeperAgent detects an interactive agent prompt (a numbered menu, a y/n prompt), it answers with the first/default option so the run doesn't stall while you're away. This is the whole point of the tool — an agent stuck waiting on a question while you're asleep defeats auto-resume — but it means a real tool-call permission prompt could plausibly be auto-approved too, since the match pattern for some adapters is broad. Pass `--auto-answer-prompts=false` if you'd rather the agent stall on unexpected prompts than risk an unattended approval. Prefer to stay in the loop entirely? `--watch-only` notifies you at the reset and lets you resume by hand. LLM-generated prompts are length-capped and denylist-checked before injection.
 
 ## How it works
 

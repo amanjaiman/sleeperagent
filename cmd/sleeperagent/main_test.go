@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"strings"
 	"testing"
@@ -71,5 +72,30 @@ func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
 	}
 	if !ended {
 		t.Fatalf("session-ended notification did not fire; events=%v", notifier.events)
+	}
+}
+
+// TestAutoAnswerPromptsFlagDefaultsToTrue mirrors how runCmd and
+// attachExistingCmd declare --auto-answer-prompts and confirms it now
+// defaults to true, and that --auto-answer-prompts=false still opts out.
+func TestAutoAnswerPromptsFlagDefaultsToTrue(t *testing.T) {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	if err := fs.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if !*autoAnswerPrompts {
+		t.Fatalf("--auto-answer-prompts default = %v, want true", *autoAnswerPrompts)
+	}
+}
+
+func TestAutoAnswerPromptsFlagCanBeDisabled(t *testing.T) {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+	autoAnswerPrompts := fs.Bool("auto-answer-prompts", true, "answer interactive prompts with the first/default option (DANGEROUS; on by default, pass =false to disable)")
+	if err := fs.Parse([]string{"--auto-answer-prompts=false"}); err != nil {
+		t.Fatal(err)
+	}
+	if *autoAnswerPrompts {
+		t.Fatalf("--auto-answer-prompts=false did not disable the flag")
 	}
 }

@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **`--auto-answer-prompts` now defaults to `true`** on both `run` and
+  `attach-existing`. Previously off by default, the flag now answers detected
+  interactive agent prompts (a numbered menu, a y/n prompt) with the
+  first/default option unless explicitly disabled. Rationale: without it, if
+  the agent asks a question while you're away, it simply sits stuck — the
+  point of SleeperAgent is unattended auto-resume, and a stalled prompt
+  defeats that. This is an accepted risk tradeoff: the match pattern for some
+  adapters is broad enough that a real tool-call permission prompt could
+  plausibly be auto-approved. Pass `--auto-answer-prompts=false` to restore
+  the old (safer, but stall-prone) behavior.
+
 ### Added
 - **Core loop (M1)** — launch a coding agent in a managed tmux session, detect the
   usage-limit message, parse the reset time, wait, and inject a static resume prompt.
