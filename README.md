@@ -1,11 +1,29 @@
-# SleeperAgent
+<h1 align="center">SleeperAgent</h1>
 
-[![CI](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg)](https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/amanjaiman/sleeperagent)](https://github.com/amanjaiman/sleeperagent/releases)
-[![Go Reference](https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg)](https://pkg.go.dev/github.com/amanjaiman/sleeperagent)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml"
+    ><img
+      alt="CI"
+      src="https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml/badge.svg"
+  /></a>
+  <a href="https://github.com/amanjaiman/sleeperagent/releases"
+    ><img
+      alt="Release"
+      src="https://img.shields.io/github/v/release/amanjaiman/sleeperagent"
+  /></a>
+  <a href="https://pkg.go.dev/github.com/amanjaiman/sleeperagent"
+    ><img
+      alt="Go Reference"
+      src="https://pkg.go.dev/badge/github.com/amanjaiman/sleeperagent.svg"
+  /></a>
+  <a href="LICENSE"
+    ><img
+      alt="License: MIT"
+      src="https://img.shields.io/badge/License-MIT-yellow.svg"
+  /></a>
+</p>
 
-**A cross-agent watchdog that resumes Claude Code / Codex sessions when their usage limits reset — and gets out of your way the moment you want to take over.**
+<h3 align="center">Your usage limit resets. Your agent keeps going.</h3>
 
 When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. SleeperAgent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
 
@@ -76,6 +94,17 @@ sleeperagent run --agent claude --name mytask
 ```
 
 `--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Press `d` to detach, or just leave it running. Run `sleeperagent` with no arguments for the built-in help.
+
+---
+
+## Ways to use it
+
+Same watchdog, different ways to run it depending on how hands-on you want to be:
+
+- **`sleeperagent run`** (foreground) — the default. Watch the agent live in your terminal, detach with a hotkey, and take over the moment you're back.
+- **`sleeperagent run --daemon` + `status`** — background it and check in later from any shell. Useful for long tasks you kick off before stepping away, on any platform.
+- **`sleeperagent run --watch-only`** — you'd rather stay in the loop. SleeperAgent notifies you at the reset instead of auto-injecting, and you resume by hand.
+- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux (or a supervisor process just crashed) and want SleeperAgent to pick up watching it without restarting anything.
 
 ---
 
