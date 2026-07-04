@@ -130,7 +130,7 @@ sleeperagent run --agent claude --name mytask
 | `--reprompt` | Local-LLM reprompt, e.g. `ollama:llama3.1` (falls back to static). |
 | `--backend` | `tmux` (default on Unix) or `pty` (default on Windows). |
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
-| `--auto-answer-prompts` | Answer interactive prompts with the first/default option (**DANGEROUS** — unattended approvals). |
+| `--auto-answer-prompts` | Answer interactive prompts with the first/default option so the run doesn't stall while you're away (**default: on**; pass `=false` to disable). |
 | `--webhook` | POST notifications to this URL as JSON. |
 | `--no-notify` | Disable desktop notifications. |
 | `--config` | Path to `config.toml` (default: OS config dir). |
@@ -216,7 +216,7 @@ Desktop notifications are on by default (best effort; `--no-notify` to disable) 
 
 SleeperAgent **waits for legitimate resets**; it does not bypass limits.
 
-Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit, loud opt-in via `--yolo`; use it only when you understand the risk. `--auto-answer-prompts` is a separate loud opt-in that leaves prompts enabled but answers detected interactive prompts with their first/default option, which may approve tool calls. LLM-generated prompts are length-capped and denylist-checked before injection.
+Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit opt-in via `--yolo`, which bypasses permission prompts entirely; use it only when you understand the risk. Separately, **`--auto-answer-prompts` defaults to on**: it doesn't remove any prompts, but if one comes up while you're away, it answers with the first/default option — including ones that approve tool calls — rather than letting the run stall. Choosing to run an agent unattended already means accepting it can act without you each cycle; pass `--auto-answer-prompts=false` if you'd rather it stall on unexpected prompts instead. LLM-generated prompts are length-capped and denylist-checked before injection.
 
 ## How it works
 
