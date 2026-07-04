@@ -132,7 +132,6 @@ sleeperagent run --agent claude --name mytask
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
 | `--auto-answer-prompts` | Answer interactive prompts with the first/default option (**DANGEROUS** — unattended approvals). |
 | `--webhook` | POST notifications to this URL as JSON. |
-| `--no-auto-detach` | Don't auto-detach when you attach to the session. |
 | `--no-notify` | Disable desktop notifications. |
 | `--config` | Path to `config.toml` (default: OS config dir). |
 
@@ -172,7 +171,7 @@ SleeperAgent is built to get out of your way. How handoff works depends on the b
 - **Hotkeys** (foreground run): `d`/`q` detach, `k` kills the session (with a `y` confirm).
 - **`sleeperagent detach --name X`** from any other shell.
 - **Ctrl-C** detaches — it never kills the session.
-- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type (disable with `--no-auto-detach`).
+- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
 
 **pty / ConPTY backend (default on Windows, optional on Unix):** the agent is a child of the supervisor, so it **can't be handed back interactively**. `detach` gives the terminal back to you until the agent exits. Use the tmux backend if you need full handoff.
