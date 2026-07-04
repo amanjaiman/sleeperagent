@@ -101,7 +101,11 @@ func TestInstallName(t *testing.T) {
 }
 
 func TestPathContainsDir(t *testing.T) {
-	if !pathContainsDir("/usr/bin"+string(os.PathListSeparator)+"/home/me/.local/bin", "/home/me/.local/bin", "linux") {
+	// Hardcode the list separators rather than using os.PathListSeparator:
+	// that constant is fixed to the build OS, but pathContainsDir takes an
+	// explicit goos and must behave the same for any target regardless of
+	// which OS this test binary itself was built for.
+	if !pathContainsDir("/usr/bin:/home/me/.local/bin", "/home/me/.local/bin", "linux") {
 		t.Fatal("expected linux PATH to contain dir")
 	}
 	if !pathContainsDir(`C:\Tools;C:\Users\me\bin`, `c:\users\me\bin`, "windows") {

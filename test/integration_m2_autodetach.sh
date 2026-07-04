@@ -18,9 +18,38 @@ SUP=$!
 sleep 3
 
 echo "== simulate a human attaching (tmux attach in a pty) =="
-script -qfc "tmux attach -t $N" /dev/null >/dev/null 2>&1 &
+# CI shells often run with no usable TERM (or one terminfo lacks, e.g. "dumb"),
+# which makes tmux refuse the attach ("open terminal failed: terminal does not
+# support clear") before it ever registers a client. Force a terminfo tmux/most
+# systems ship so the simulated attach actually takes.
+TERM=xterm script -qfc "tmux attach -t $N" /dev/null >/tmp/ak_auto_script.log 2>&1 &
 ATT=$!
-sleep 5
+
+# Wait for tmux to actually register the attached client before asserting
+# anything about the supervisor's reaction — on a loaded/CI runner both the
+# `script` pty attach and the supervisor's next poll can lag noticeably past a
+# fixed sleep, which made this flaky. Poll instead of guessing a duration.
+attached=0
+for _ in $(seq 1 20); do
+  if [ -n "$(tmux list-clients -t "$N" 2>/dev/null)" ]; then
+    attached=1
+    break
+  fi
+  sleep 0.5
+done
+if [ "$attached" -ne 1 ]; then
+  echo "  FAIL: tmux never saw an attached client (script/tmux attach didn't take)"
+  echo "---- script log ----"; cat /tmp/ak_auto_script.log
+  fail=1
+fi
+
+# Give the supervisor a few poll cycles to notice and detach.
+for _ in $(seq 1 20); do
+  if ! kill -0 "$SUP" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
 
 check "supervisor auto-detached" '! kill -0 "$SUP" 2>/dev/null'
 check "session still alive (handed to user)" 'tmux has-session -t "$N" 2>/dev/null'
