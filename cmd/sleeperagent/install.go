@@ -224,11 +224,16 @@ func ensurePathInShellProfile(dir, goos string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
+	if profile == "" {
+		// Unrecognized shell (fish, nushell, …) — an `export PATH=…` line would
+		// be wrong or unread there, so leave it to the printed remediation.
+		return "", false, nil
+	}
 	content, err := os.ReadFile(profile)
 	if err != nil && !os.IsNotExist(err) {
 		return profile, false, err
 	}
-	if strings.Contains(string(content), dir) {
+	if profileMentionsDir(string(content), dir) {
 		return profile, false, nil
 	}
 	block := "# Added by sleeperagent install.\n" + shellPathLine(dir) + "\n"
@@ -259,6 +264,25 @@ func defaultShellProfile(goos string) (string, error) {
 	return shellProfileInHome(home, os.Getenv("SHELL"), goos), nil
 }
 
+// profileMentionsDir reports whether an uncommented line of the profile
+// already references dir, so a commented-out or disabled entry doesn't count
+// as coverage.
+func profileMentionsDir(content, dir string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.Contains(trimmed, dir) {
+			return true
+		}
+	}
+	return false
+}
+
+// shellProfileInHome returns the profile file the user's shell actually reads
+// on new terminals, or "" for shells where an `export PATH` line wouldn't work
+// (fish and friends).
 func shellProfileInHome(home, shell, goos string) string {
 	switch filepath.Base(shell) {
 	case "zsh":
@@ -270,12 +294,16 @@ func shellProfileInHome(home, shell, goos string) string {
 		if goos == "darwin" {
 			return filepath.Join(home, ".bash_profile")
 		}
-		return filepath.Join(home, ".profile")
-	default:
+		// Linux terminal emulators open interactive non-login shells, which
+		// read .bashrc; .profile is skipped entirely once .bash_profile exists.
+		return filepath.Join(home, ".bashrc")
+	case "sh", "", ".":
 		if goos == "darwin" {
 			return filepath.Join(home, ".zprofile")
 		}
 		return filepath.Join(home, ".profile")
+	default:
+		return ""
 	}
 }
 

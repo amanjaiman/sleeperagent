@@ -149,6 +149,73 @@ func TestEnsurePathInShellProfileAddsMacZProfile(t *testing.T) {
 	}
 }
 
+func TestShellProfileInHome(t *testing.T) {
+	tests := []struct {
+		shell, goos, want string
+	}{
+		{"/bin/zsh", "darwin", ".zprofile"},
+		{"/usr/bin/zsh", "linux", ".zshrc"},
+		{"/bin/bash", "darwin", ".bash_profile"},
+		{"/bin/bash", "linux", ".bashrc"},
+		{"/bin/sh", "linux", ".profile"},
+		{"", "darwin", ".zprofile"},
+		{"/usr/bin/fish", "linux", ""},
+		{"/usr/bin/fish", "darwin", ""},
+	}
+	for _, tt := range tests {
+		want := tt.want
+		if want != "" {
+			want = filepath.Join("home", want)
+		}
+		if got := shellProfileInHome("home", tt.shell, tt.goos); got != want {
+			t.Errorf("shellProfileInHome(%q, %q) = %q, want %q", tt.shell, tt.goos, got, want)
+		}
+	}
+}
+
+func TestEnsurePathInShellProfileSkipsUnknownShell(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/usr/bin/fish")
+
+	profile, updated, err := ensurePathInShellProfile(filepath.Join(home, "bin"), "linux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile != "" || updated {
+		t.Fatalf("expected no profile update for fish, got profile=%q updated=%v", profile, updated)
+	}
+}
+
+func TestEnsurePathInShellProfileIgnoresCommentedMention(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	dir := filepath.Join(home, "bin")
+	rc := filepath.Join(home, ".bashrc")
+	if err := os.WriteFile(rc, []byte("# "+shellPathLine(dir)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	profile, updated, err := ensurePathInShellProfile(dir, "linux")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile != rc {
+		t.Fatalf("profile = %q, want %q", profile, rc)
+	}
+	if !updated {
+		t.Fatal("expected commented-out mention to still trigger an update")
+	}
+	got, err := os.ReadFile(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "\n"+shellPathLine(dir)) {
+		t.Fatalf("profile missing uncommented PATH line:\n%s", got)
+	}
+}
+
 func TestShellPathLineQuotesSpaces(t *testing.T) {
 	got := shellPathLine("/Users/me/Library/Application Support/sleeperagent/bin")
 	want := `export PATH="$PATH":'/Users/me/Library/Application Support/sleeperagent/bin'`
