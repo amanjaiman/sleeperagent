@@ -43,8 +43,20 @@ echo "== launching supervisor against real tmux =="
 "$BIN" run --agent fake --name "$SESSION" --config "$CFG" --prompt "continue" -- "$AGENT" &
 SUP=$!
 
-# Give it time to: detect (1s) + wait (~6s+1s buffer) + inject + echo.
-sleep 14
+# Poll for the limit -> wait -> inject -> echo cycle to complete instead of a
+# fixed sleep: the cycle is detect (1 poll) + wait (~6s reset + 1s buffer) +
+# inject + the agent echoing it back, and a fixed duration raced this too
+# tightly under a loaded/CI runner. Ceiling is generous; the marker or an early
+# supervisor exit both end the wait promptly.
+for _ in $(seq 1 40); do
+  if grep -q "continue" "$MARKER" 2>/dev/null; then
+    break
+  fi
+  if ! kill -0 "$SUP" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
 
 echo "== final pane =="
 tmux capture-pane -p -t "$SESSION" 2>/dev/null || echo "(session gone)"
