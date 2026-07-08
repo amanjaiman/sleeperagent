@@ -39,7 +39,7 @@ Put it on your `PATH`:
 ```
 
 If the install directory is not already on `PATH`, the command prints the exact `setx PATH` or `export PATH` line to run, plus a reminder to open a new shell.
-On macOS/Linux, `install` also tries to add that PATH update to your shell profile automatically (zsh, bash, and sh; other shells get the printed line only).
+On macOS/Linux, `install` also tries to add that PATH update to your shell profile automatically (zsh, bash, and sh; other shells get the printed line only). Pass `--no-profile` to skip that and just print the line yourself.
 
 **With the Go toolchain:**
 
@@ -93,7 +93,7 @@ sleeperagent run --agent claude --name mytask
 | `rm --name N [--force]` / `rm --all` | Remove a stale/ended instance record (e.g. after the agent exited). `--all` prunes every record with no running supervisor. |
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
 | `parse --agent A "text…"` | Test a captured limit string against an agent's patterns and show the resolved reset. |
-| `install [--dir DIR] [--force]` | Copy this binary to a PATH directory. |
+| `install [--dir DIR] [--force] [--no-profile]` | Copy this binary to a PATH directory. |
 | `version` | Print the build version. |
 
 ### `run` flags

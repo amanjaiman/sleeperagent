@@ -16,6 +16,7 @@ func installCmd(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	dir := fs.String("dir", "", "directory to install sleeperagent into")
 	force := fs.Bool("force", false, "overwrite an existing different file")
+	noProfile := fs.Bool("no-profile", false, "don't modify shell profile files; just print the PATH line")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -50,7 +51,9 @@ func installCmd(args []string) error {
 		return nil
 	}
 	fmt.Printf("sleeperagent install: %s is not on PATH yet.\n", targetDir)
-	if profile, updated, err := ensurePathInShellProfile(targetDir, runtime.GOOS); err == nil && profile != "" {
+	if *noProfile {
+		fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	} else if profile, updated, err := ensurePathInShellProfile(targetDir, runtime.GOOS); err == nil && profile != "" {
 		if updated {
 			fmt.Printf("Added it for future shells in %s.\n", profile)
 		} else {
