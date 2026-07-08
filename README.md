@@ -40,7 +40,7 @@ When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you 
 - **Cross-platform** — native on **Linux, macOS, and Windows** (no WSL required).
 - **Graceful handoff** — hotkeys, `detach`/`stop`, auto-detach when you attach, Ctrl-C that detaches rather than kills.
 - **Local-LLM reprompt** *(optional)* — a local Ollama model writes a context-aware continuation instruction from the transcript + git diff, validated before use. Falls back to a static prompt on any doubt.
-- **Operable & safe** — `status`, desktop + webhook notifications, a `parse` command to tune patterns, and unattended tool-calls **off by default**.
+- **Operable & safe** — `status`, desktop + webhook notifications, a `parse` command to tune patterns, and unattended *tool calls* **off by default** (`--yolo` opts in).
 
 See [docs/SPEC.md](docs/SPEC.md) for the full design rationale.
 
@@ -57,6 +57,7 @@ Put it on your `PATH`:
 ```
 
 If the install directory is not already on `PATH`, the command prints the exact `setx PATH` or `export PATH` line to run, plus a reminder to open a new shell.
+On macOS/Linux, `install` also tries to add that PATH update to your shell profile automatically (zsh, bash, and sh; other shells get the printed line only). Pass `--no-profile` to skip that and just print the line yourself.
 
 **With the Go toolchain:**
 
@@ -78,7 +79,7 @@ SleeperAgent needs a "session backend" — something it can run the agent inside
 
 | OS | Default backend | Setup | Handoff |
 |---|---|---|---|
-| **Linux / macOS** | `tmux` | install `tmux` (`apt install tmux` / `brew install tmux`) | **full** — agent survives detach; `tmux attach` to take over |
+| **Linux / macOS** | `tmux` when available, otherwise `pty` | optional `tmux` (`apt install tmux` / `brew install tmux`) for full handoff | **full** with tmux; reduced with pty |
 | **Linux / macOS** | `pty` (`--backend pty`) | none | reduced — agent is bound to the supervisor |
 | **Windows** | `pty` (ConPTY) | none (Windows 10 1809+) | reduced — agent is bound to the supervisor |
 
@@ -117,7 +118,7 @@ sleeperagent run --agent claude --name mytask
 | `rm --name N [--force]` / `rm --all` | Remove a stale/ended instance record (e.g. after the agent exited). `--all` prunes every record with no running supervisor. |
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
 | `parse --agent A "text…"` | Test a captured limit string against an agent's patterns and show the resolved reset. |
-| `install [--dir DIR] [--force]` | Copy this binary to a PATH directory. |
+| `install [--dir DIR] [--force] [--no-profile]` | Copy this binary to a PATH directory. |
 | `version` | Print the build version. |
 
 ### `run` flags
@@ -128,7 +129,7 @@ sleeperagent run --agent claude --name mytask
 | `--name` | Instance / tmux session name (default `sleeperagent-<agent>`). |
 | `--prompt` | Static resume prompt to inject on reset. |
 | `--reprompt` | Local-LLM reprompt, e.g. `ollama:llama3.1` (falls back to static). |
-| `--backend` | `tmux` (default on Unix) or `pty` (default on Windows). |
+| `--backend` | `tmux` or `pty`. Unix defaults to tmux when it is available, otherwise pty; Windows defaults to pty. |
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
 | `--auto-answer-prompts` | Answer interactive prompts with the first/default option so the run doesn't stall while you're away (**default: on**; pass `=false` to disable). |
 | `--webhook` | POST notifications to this URL as JSON. |
@@ -144,7 +145,7 @@ sleeperagent run --agent codex --prompt "Continue; run the tests after."
 # Let a local model write the continuation instruction each reset
 sleeperagent run --agent claude --reprompt ollama:llama3.1
 
-# Check on a running instance from another shell
+# Check on running instances from any other shell (works on all platforms)
 sleeperagent status
 
 # Custom launch command — same Claude adapter, but your own flags / wrapper / binary
@@ -166,7 +167,7 @@ sleeperagent parse --agent claude "5-hour limit reached ∙ resets 2pm"
 
 SleeperAgent is built to get out of your way. How handoff works depends on the backend:
 
-**tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over.
+**tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over. Install tmux (`brew install tmux` on macOS) or pass `--backend tmux` if you specifically need this behavior.
 
 - **Hotkeys** (foreground run): `d`/`q` detach, `k` kills the session (with a `y` confirm).
 - **`sleeperagent detach --name X`** from any other shell.
@@ -174,7 +175,7 @@ SleeperAgent is built to get out of your way. How handoff works depends on the b
 - **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
 
-**pty / ConPTY backend (default on Windows, optional on Unix):** the agent is a child of the supervisor, so it **can't be handed back interactively**. `detach` gives the terminal back to you until the agent exits. Use the tmux backend if you need full handoff.
+**pty / ConPTY backend (default on Windows, automatic Unix fallback when tmux is missing):** the agent is a child of the supervisor, so it **can't be handed back interactively**. `detach` gives the terminal back to you until the agent exits; `stop --kill` ends the agent. Use the tmux backend if you need full handoff.
 
 ---
 

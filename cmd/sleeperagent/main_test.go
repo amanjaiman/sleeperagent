@@ -19,6 +19,23 @@ type watchTestPane struct {
 	ended  bool
 }
 
+func TestFlagWasSet(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	backend := fs.String("backend", defaultBackend(), "")
+	if err := fs.Parse([]string{"--backend", "tmux"}); err != nil {
+		t.Fatal(err)
+	}
+	if *backend != "tmux" {
+		t.Fatalf("backend = %q, want tmux", *backend)
+	}
+	if !flagWasSet(fs, "backend") {
+		t.Fatal("expected backend flag to be reported as set")
+	}
+	if flagWasSet(fs, "agent") {
+		t.Fatal("did not expect missing flag to be reported as set")
+	}
+}
+
 func (p *watchTestPane) Capture(int) (string, error)   { return p.screen, nil }
 func (p *watchTestPane) Inject(string, string) error   { return nil }
 func (p *watchTestPane) AttachHint() string            { return "tmux attach -t test" }

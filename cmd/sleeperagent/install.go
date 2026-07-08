@@ -16,6 +16,7 @@ func installCmd(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	dir := fs.String("dir", "", "directory to install sleeperagent into")
 	force := fs.Bool("force", false, "overwrite an existing different file")
+	noProfile := fs.Bool("no-profile", false, "don't modify shell profile files; just print the PATH line")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -50,7 +51,20 @@ func installCmd(args []string) error {
 		return nil
 	}
 	fmt.Printf("sleeperagent install: %s is not on PATH yet.\n", targetDir)
-	fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	if *noProfile {
+		fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	} else if profile, updated, err := ensurePathInShellProfile(targetDir, runtime.GOOS); err == nil && profile != "" {
+		if updated {
+			fmt.Printf("Added it for future shells in %s.\n", profile)
+		} else {
+			fmt.Printf("A PATH update for this directory already exists in %s.\n", profile)
+		}
+	} else {
+		if err != nil {
+			fmt.Printf("Could not update your shell profile automatically: %v\n", err)
+		}
+		fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	}
 	fmt.Println("Open a new shell after updating PATH, then run: sleeperagent version")
 	return nil
 }
@@ -202,5 +216,104 @@ func pathRemediation(dir, goos string) string {
 	if goos == "windows" {
 		return fmt.Sprintf("Add it for future shells with:\n  setx PATH \"%%PATH%%;%s\"\nOr add it in Settings > System > About > Advanced system settings > Environment Variables.", dir)
 	}
-	return fmt.Sprintf("Add it for future shells with:\n  export PATH=\"$PATH:%s\"\nPut that line in your shell profile if you want it to persist.", dir)
+	return fmt.Sprintf("Add it for future shells with:\n  %s\nPut that line in your shell profile if you want it to persist.", shellPathLine(dir))
+}
+
+func ensurePathInShellProfile(dir, goos string) (string, bool, error) {
+	if goos == "windows" {
+		return "", false, nil
+	}
+	profile, err := defaultShellProfile(goos)
+	if err != nil {
+		return "", false, err
+	}
+	if profile == "" {
+		// Unrecognized shell (fish, nushell, …) — an `export PATH=…` line would
+		// be wrong or unread there, so leave it to the printed remediation.
+		return "", false, nil
+	}
+	content, err := os.ReadFile(profile)
+	if err != nil && !os.IsNotExist(err) {
+		return profile, false, err
+	}
+	if profileMentionsDir(string(content), dir) {
+		return profile, false, nil
+	}
+	block := "# Added by sleeperagent install.\n" + shellPathLine(dir) + "\n"
+	f, err := os.OpenFile(profile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return profile, false, err
+	}
+	defer f.Close()
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		block = "\n" + block
+	}
+	if _, err := f.WriteString(block); err != nil {
+		return profile, false, err
+	}
+	return profile, true, nil
+}
+
+func defaultShellProfile(goos string) (string, error) {
+	if goos != "windows" {
+		if home := os.Getenv("HOME"); home != "" {
+			return shellProfileInHome(home, os.Getenv("SHELL"), goos), nil
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return shellProfileInHome(home, os.Getenv("SHELL"), goos), nil
+}
+
+// profileMentionsDir reports whether an uncommented line of the profile
+// already references dir, so a commented-out or disabled entry doesn't count
+// as coverage.
+func profileMentionsDir(content, dir string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.Contains(trimmed, dir) {
+			return true
+		}
+	}
+	return false
+}
+
+// shellProfileInHome returns the profile file the user's shell actually reads
+// on new terminals, or "" for shells where an `export PATH` line wouldn't work
+// (fish and friends).
+func shellProfileInHome(home, shell, goos string) string {
+	switch filepath.Base(shell) {
+	case "zsh":
+		if goos == "darwin" {
+			return filepath.Join(home, ".zprofile")
+		}
+		return filepath.Join(home, ".zshrc")
+	case "bash":
+		if goos == "darwin" {
+			return filepath.Join(home, ".bash_profile")
+		}
+		// Linux terminal emulators open interactive non-login shells, which
+		// read .bashrc; .profile is skipped entirely once .bash_profile exists.
+		return filepath.Join(home, ".bashrc")
+	case "sh", "", ".":
+		if goos == "darwin" {
+			return filepath.Join(home, ".zprofile")
+		}
+		return filepath.Join(home, ".profile")
+	default:
+		return ""
+	}
+}
+
+func shellPathLine(dir string) string {
+	return `export PATH="$PATH":` + shellSingleQuote(dir)
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
