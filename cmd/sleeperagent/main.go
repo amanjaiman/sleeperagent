@@ -97,7 +97,7 @@ Run flags:
   --name     string  instance / tmux session name (default "sleeperagent-<agent>")
   --prompt   string  static resume prompt to inject on reset
   --reprompt string  local-LLM reprompt, e.g. "ollama:llama3.1" (falls back to static)
-  --backend  string  session backend: "tmux" (default) or "pty" (no-tmux fallback)
+  --backend  string  session backend: "tmux" or "pty" (Unix falls back to pty if tmux is missing)
   --webhook  string  POST notifications to this URL
   --config   string  path to config.toml (default: OS config dir)
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
@@ -134,6 +134,7 @@ func runCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	backendExplicit := flagWasSet(fs, "backend")
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
@@ -183,7 +184,14 @@ func runCmd(args []string) error {
 	var afterDetach func(ctx context.Context)
 	var attachHint string
 	var restoreLogOutput func()
-	switch *backend {
+	selectedBackend := *backend
+	if selectedBackend == "tmux" && !backendExplicit {
+		if err := tmux.New(instance, "").Available(); err != nil {
+			log.Printf("tmux not found on PATH; falling back to --backend pty (install tmux or pass --backend tmux for full handoff)")
+			selectedBackend = "pty"
+		}
+	}
+	switch selectedBackend {
 	case "tmux":
 		tx := tmux.New(instance, "")
 		if err := tx.Available(); err != nil {
@@ -227,7 +235,7 @@ func runCmd(args []string) error {
 			pc.Wait(ctx)
 		}
 	default:
-		return fmt.Errorf("unknown backend %q (use \"tmux\" or \"pty\")", *backend)
+		return fmt.Errorf("unknown backend %q (use \"tmux\" or \"pty\")", selectedBackend)
 	}
 
 	return watchSession(watchParams{
@@ -246,8 +254,18 @@ func runCmd(args []string) error {
 		cwd:               cwd,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
-		transparentTTY:    *backend == "pty",
+		transparentTTY:    selectedBackend == "pty",
 	})
+}
+
+func flagWasSet(fs *flag.FlagSet, name string) bool {
+	seen := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			seen = true
+		}
+	})
+	return seen
 }
 
 // watchParams bundles everything watchSession needs so both `run` and

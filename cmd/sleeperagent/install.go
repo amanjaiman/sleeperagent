@@ -50,7 +50,18 @@ func installCmd(args []string) error {
 		return nil
 	}
 	fmt.Printf("sleeperagent install: %s is not on PATH yet.\n", targetDir)
-	fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	if profile, updated, err := ensurePathInShellProfile(targetDir, runtime.GOOS); err == nil && profile != "" {
+		if updated {
+			fmt.Printf("Added it for future shells in %s.\n", profile)
+		} else {
+			fmt.Printf("A PATH update for this directory already exists in %s.\n", profile)
+		}
+	} else {
+		if err != nil {
+			fmt.Printf("Could not update your shell profile automatically: %v\n", err)
+		}
+		fmt.Println(pathRemediation(targetDir, runtime.GOOS))
+	}
 	fmt.Println("Open a new shell after updating PATH, then run: sleeperagent version")
 	return nil
 }
@@ -202,5 +213,76 @@ func pathRemediation(dir, goos string) string {
 	if goos == "windows" {
 		return fmt.Sprintf("Add it for future shells with:\n  setx PATH \"%%PATH%%;%s\"\nOr add it in Settings > System > About > Advanced system settings > Environment Variables.", dir)
 	}
-	return fmt.Sprintf("Add it for future shells with:\n  export PATH=\"$PATH:%s\"\nPut that line in your shell profile if you want it to persist.", dir)
+	return fmt.Sprintf("Add it for future shells with:\n  %s\nPut that line in your shell profile if you want it to persist.", shellPathLine(dir))
+}
+
+func ensurePathInShellProfile(dir, goos string) (string, bool, error) {
+	if goos == "windows" {
+		return "", false, nil
+	}
+	profile, err := defaultShellProfile(goos)
+	if err != nil {
+		return "", false, err
+	}
+	content, err := os.ReadFile(profile)
+	if err != nil && !os.IsNotExist(err) {
+		return profile, false, err
+	}
+	if strings.Contains(string(content), dir) {
+		return profile, false, nil
+	}
+	block := "# Added by sleeperagent install.\n" + shellPathLine(dir) + "\n"
+	f, err := os.OpenFile(profile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return profile, false, err
+	}
+	defer f.Close()
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		block = "\n" + block
+	}
+	if _, err := f.WriteString(block); err != nil {
+		return profile, false, err
+	}
+	return profile, true, nil
+}
+
+func defaultShellProfile(goos string) (string, error) {
+	if goos != "windows" {
+		if home := os.Getenv("HOME"); home != "" {
+			return shellProfileInHome(home, os.Getenv("SHELL"), goos), nil
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return shellProfileInHome(home, os.Getenv("SHELL"), goos), nil
+}
+
+func shellProfileInHome(home, shell, goos string) string {
+	switch filepath.Base(shell) {
+	case "zsh":
+		if goos == "darwin" {
+			return filepath.Join(home, ".zprofile")
+		}
+		return filepath.Join(home, ".zshrc")
+	case "bash":
+		if goos == "darwin" {
+			return filepath.Join(home, ".bash_profile")
+		}
+		return filepath.Join(home, ".profile")
+	default:
+		if goos == "darwin" {
+			return filepath.Join(home, ".zprofile")
+		}
+		return filepath.Join(home, ".profile")
+	}
+}
+
+func shellPathLine(dir string) string {
+	return `export PATH="$PATH":` + shellSingleQuote(dir)
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

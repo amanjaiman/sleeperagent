@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -110,5 +111,48 @@ func TestPathContainsDir(t *testing.T) {
 	}
 	if !pathContainsDir(`C:\Tools;C:\Users\me\bin`, `c:\users\me\bin`, "windows") {
 		t.Fatal("expected windows PATH comparison to be case-insensitive")
+	}
+}
+
+func TestEnsurePathInShellProfileAddsMacZProfile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/zsh")
+	dir := filepath.Join(home, ".local", "bin")
+
+	profile, updated, err := ensurePathInShellProfile(dir, "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated {
+		t.Fatal("expected profile to be updated")
+	}
+	wantProfile := filepath.Join(home, ".zprofile")
+	if profile != wantProfile {
+		t.Fatalf("profile = %q, want %q", profile, wantProfile)
+	}
+	got, err := os.ReadFile(wantProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantLine := shellPathLine(dir)
+	if !strings.Contains(string(got), wantLine) {
+		t.Fatalf("profile does not contain %q:\n%s", wantLine, got)
+	}
+
+	_, updated, err = ensurePathInShellProfile(dir, "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated {
+		t.Fatal("expected second profile update to be idempotent")
+	}
+}
+
+func TestShellPathLineQuotesSpaces(t *testing.T) {
+	got := shellPathLine("/Users/me/Library/Application Support/sleeperagent/bin")
+	want := `export PATH="$PATH":'/Users/me/Library/Application Support/sleeperagent/bin'`
+	if got != want {
+		t.Fatalf("shellPathLine = %q, want %q", got, want)
 	}
 }
