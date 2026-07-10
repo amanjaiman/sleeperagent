@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-10
+
 ### Changed
 - **tmux runs now start attached** — `sleeperagent run` (and `attach-existing`)
   from a real terminal puts your terminal inside the tmux session immediately
@@ -111,5 +113,6 @@ upgrading.
   times are cleared once the agent resumes, so `status` reports `RUNNING` with no
   leftover countdown.
 
-[Unreleased]: https://github.com/amanjaiman/sleeperagent/compare/v0.3.0...main
+[Unreleased]: https://github.com/amanjaiman/sleeperagent/compare/v0.4.0...main
+[0.4.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.2.0...v0.3.0
