@@ -94,7 +94,9 @@ Optional extras: a local [Ollama](https://ollama.com) for `--reprompt`; `notify-
 sleeperagent run --agent claude --name mytask
 ```
 
-`--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Press `d` to detach, or just leave it running. Run `sleeperagent` with no arguments for the built-in help.
+`--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Run `sleeperagent` with no arguments for the built-in help.
+
+On every platform, `run` from a real terminal drops you **straight into the live agent**: prompt it and use it exactly as if you'd launched it directly, while SleeperAgent watches in the background and auto-resumes after a limit reset. On the tmux backend, detach your view with the tmux prefix + `d` (watchdog keeps running), or pass `--detached` to skip attaching entirely.
 
 ---
 
@@ -130,6 +132,7 @@ sleeperagent run --agent claude --name mytask
 | `--prompt` | Static resume prompt to inject on reset. |
 | `--reprompt` | Local-LLM reprompt, e.g. `ollama:llama3.1` (falls back to static). |
 | `--backend` | `tmux` or `pty`. Unix defaults to tmux when it is available, otherwise pty; Windows defaults to pty. |
+| `--detached` | tmux backend: don't attach this terminal to the session; watch from the console with the `d`/`q`/`k` hotkeys instead. |
 | `--yolo` | Append the agent's skip-permissions flag (**DANGEROUS** — unattended, no prompts). |
 | `--auto-answer-prompts` | Answer interactive prompts with the first/default option so the run doesn't stall while you're away (**default: on**; pass `=false` to disable). |
 | `--webhook` | POST notifications to this URL as JSON. |
@@ -169,11 +172,11 @@ SleeperAgent is built to get out of your way. How handoff works depends on the b
 
 **tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over. Install tmux (`brew install tmux` on macOS) or pass `--backend tmux` if you specifically need this behavior.
 
-- **Hotkeys** (foreground run): `d`/`q` detach, `k` kills the session (with a `y` confirm).
-- **`sleeperagent detach --name X`** from any other shell.
-- **Ctrl-C** detaches — it never kills the session.
-- **Auto-detach:** the moment you `tmux attach`, SleeperAgent notices and steps aside so you don't both type.
+- **You start attached:** `run` from a terminal puts you inside the session immediately — prompt the agent as usual while the watchdog monitors. Detach the *view* with the tmux prefix + `d` (default `Ctrl-b d`); the watchdog keeps running and you get its console log back.
+- **`sleeperagent detach --name X`** from any other shell stops watching (the session keeps running).
+- **Auto-detach:** if you `tmux attach` *after* detaching your initial view, SleeperAgent treats it as a takeover and steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
+- **`--detached` mode:** the pre-0.4 console view — supervisor logs in your terminal with hotkeys `d`/`q` detach, `k` kill (with a `y` confirm); Ctrl-C detaches, never kills.
 
 **pty / ConPTY backend (default on Windows, automatic Unix fallback when tmux is missing):** the agent is a child of the supervisor, so it **can't be handed back interactively**. `detach` gives the terminal back to you until the agent exits; `stop --kill` ends the agent. Use the tmux backend if you need full handoff.
 

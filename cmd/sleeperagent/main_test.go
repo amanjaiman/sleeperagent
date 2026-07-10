@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/amanjaiman/sleeperagent/internal/adapter"
@@ -15,8 +16,9 @@ import (
 )
 
 type watchTestPane struct {
-	screen string
-	ended  bool
+	screen   string
+	ended    bool
+	attached bool
 }
 
 func TestFlagWasSet(t *testing.T) {
@@ -40,7 +42,7 @@ func (p *watchTestPane) Capture(int) (string, error)   { return p.screen, nil }
 func (p *watchTestPane) Inject(string, string) error   { return nil }
 func (p *watchTestPane) AttachHint() string            { return "tmux attach -t test" }
 func (p *watchTestPane) Kill() error                   { return nil }
-func (p *watchTestPane) ClientAttached() (bool, error) { return false, nil }
+func (p *watchTestPane) ClientAttached() (bool, error) { return p.attached, nil }
 func (p *watchTestPane) Ended() (bool, error)          { return p.ended, nil }
 
 type captureNotifier struct {
@@ -89,6 +91,23 @@ func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
 	}
 	if !ended {
 		t.Fatalf("session-ended notification did not fire; events=%v", notifier.events)
+	}
+}
+
+// TestAttachSuppressingPaneHidesSelfView confirms the interactive-attach
+// wrapper hides our own tmux client from the auto-detach check while the
+// self-view is active, and passes real attaches through once it exits.
+func TestAttachSuppressingPaneHidesSelfView(t *testing.T) {
+	viewing := &atomic.Bool{}
+	p := attachSuppressingPane{Pane: &watchTestPane{attached: true}, viewing: viewing}
+
+	viewing.Store(true)
+	if attached, _ := p.ClientAttached(); attached {
+		t.Fatal("self-view should be hidden from the auto-detach check")
+	}
+	viewing.Store(false)
+	if attached, _ := p.ClientAttached(); !attached {
+		t.Fatal("a client attached after the self-view exits should be reported")
 	}
 }
 

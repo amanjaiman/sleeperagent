@@ -6,6 +6,23 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **tmux runs now start attached** — `sleeperagent run` from a real terminal
+  puts your terminal inside the tmux session immediately (via a supervised
+  `tmux attach`), so Linux/macOS now match the Windows/ConPTY experience:
+  prompt and use the agent exactly as if you'd launched it directly, while the
+  watchdog monitors from the same process and auto-resumes after a limit
+  reset. The supervisor's own attach client no longer triggers
+  auto-detach-on-attach; detaching your view (tmux prefix + `d`) keeps the
+  watchdog running and returns you to its console log, and a *subsequent*
+  manual `tmux attach` still auto-detaches the watchdog as before. Supervisor
+  logs are written to the instance log file while the view is attached
+  (`sleeperagent logs --name N`). Non-TTY runs (scripts, CI) are unchanged.
+
+### Added
+- **`--detached`** flag on `run` — opt out of the new attach-on-start behavior
+  and watch from the console with the `d`/`q`/`k` hotkeys, as before.
+
 ## [0.3.0] - 2026-07-04
 
 This release also folds in everything previously listed under

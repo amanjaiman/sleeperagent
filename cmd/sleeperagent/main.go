@@ -15,8 +15,12 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
+
+	"golang.org/x/term"
 
 	"github.com/amanjaiman/sleeperagent/internal/adapter"
 	"github.com/amanjaiman/sleeperagent/internal/config"
@@ -98,6 +102,10 @@ Run flags:
   --prompt   string  static resume prompt to inject on reset
   --reprompt string  local-LLM reprompt, e.g. "ollama:llama3.1" (falls back to static)
   --backend  string  session backend: "tmux" or "pty" (Unix falls back to pty if tmux is missing)
+  --detached         tmux backend: don't attach this terminal to the session;
+                     watch from the console instead (default is to attach when
+                     run from a real terminal, so you can prompt the agent
+                     directly while the watchdog monitors)
   --webhook  string  POST notifications to this URL
   --config   string  path to config.toml (default: OS config dir)
   --yolo             append the agent's skip-permissions flag (DANGEROUS, unattended)
@@ -129,6 +137,7 @@ func runCmd(args []string) error {
 	cfgPath := fs.String("config", "", "path to config.toml")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
 	backend := fs.String("backend", defaultBackend(), `session backend: "tmux" or "pty"`)
+	detached := fs.Bool("detached", false, "tmux backend: do not attach this terminal to the session; watch from the console instead")
 	webhookURL := fs.String("webhook", "", "POST notifications to this URL")
 	noNotify := fs.Bool("no-notify", false, "disable desktop notifications")
 	yolo := fs.Bool("yolo", false, "append the agent's skip-permissions flag (DANGEROUS)")
@@ -186,6 +195,7 @@ func runCmd(args []string) error {
 	var afterDetach func(ctx context.Context)
 	var attachHint string
 	var restoreLogOutput func()
+	var interactiveAttach bool
 	selectedBackend := *backend
 	if selectedBackend == "tmux" && !backendExplicit {
 		if err := tmux.New(instance, "").Available(); err != nil {
@@ -211,6 +221,54 @@ func runCmd(args []string) error {
 		}
 		afterDetach = func(context.Context) {
 			log.Printf("detached. session %q left running — reattach with: %s", instance, tx.AttachHint())
+		}
+
+		// Interactive attach (the default in a real terminal): put the user's
+		// terminal inside the session so they can prompt the agent directly,
+		// while the supervisor keeps polling in this process. Opt out with
+		// --detached; non-TTY contexts (scripts, CI) keep the detached behavior.
+		if !*detached && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+			interactiveAttach = true
+			restore, rerr := redirectLogsToInstanceFile(instance)
+			if rerr != nil {
+				return rerr
+			}
+			var restoreOnce sync.Once
+			restoreLogs := func() { restoreOnce.Do(restore) }
+			defer restoreLogs()
+
+			// viewing is set before the supervisor starts so its first polls
+			// already ignore our own attach client (see attachSuppressingPane).
+			viewing := &atomic.Bool{}
+			viewing.Store(true)
+			stopping := &atomic.Bool{}
+			pane = attachSuppressingPane{Pane: tx, viewing: viewing}
+			foreground = func(ctx context.Context) {
+				err := tx.Attach(ctx)
+				viewing.Store(false)
+				restoreLogs()
+				if err != nil {
+					log.Printf("tmux attach ended: %v", err)
+				}
+				if ctx.Err() == nil && !stopping.Load() && tx.HasSession() {
+					log.Printf("view detached; still watching session %q. Reattach with: %s — stop watching with: sleeperagent detach --name %s",
+						instance, tx.AttachHint(), instance)
+				}
+			}
+			afterDetach = func(context.Context) {
+				stopping.Store(true)
+				// Close our own view so the terminal comes back to this process
+				// before it exits. If the self-view is already gone (e.g. the
+				// user detached it and later re-attached manually, triggering
+				// auto-detach), leave the clients alone — kicking the human off
+				// the session we just handed them would be rude.
+				if viewing.Load() {
+					_ = tx.DetachClients()
+					waitCondition(func() bool { return !viewing.Load() }, 2*time.Second)
+				}
+				restoreLogs()
+				log.Printf("detached. session %q left running — reattach with: %s", instance, tx.AttachHint())
+			}
 		}
 	case "pty":
 		restore, err := redirectLogsToInstanceFile(instance)
@@ -257,7 +315,36 @@ func runCmd(args []string) error {
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 		transparentTTY:    selectedBackend == "pty",
+		interactiveAttach: interactiveAttach,
 	})
+}
+
+// attachSuppressingPane hides the supervisor's own attach client from the
+// auto-detach check: a self-attach means "the user is driving the agent while
+// the watchdog watches", not "the user took over — step aside". Once the
+// self-view exits (viewing is false), a newly attached client is a real
+// takeover and auto-detach applies as usual.
+type attachSuppressingPane struct {
+	supervisor.Pane
+	viewing *atomic.Bool
+}
+
+func (p attachSuppressingPane) ClientAttached() (bool, error) {
+	if p.viewing.Load() {
+		return false, nil
+	}
+	return p.Pane.ClientAttached()
+}
+
+// waitCondition polls cond until it holds or timeout elapses.
+func waitCondition(cond func() bool, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func flagWasSet(fs *flag.FlagSet, name string) bool {
@@ -289,6 +376,7 @@ type watchParams struct {
 	autoAnswerPrompts bool
 	notifier          notify.Notifier
 	transparentTTY    bool
+	interactiveAttach bool
 }
 
 // watchSession runs the supervisor loop against an already-prepared backend.
@@ -313,6 +401,8 @@ func watchSession(p watchParams) error {
 	}
 	if p.transparentTTY {
 		log.Printf("pty pass-through: stdin/stdout are reserved for the agent; from another shell use `sleeperagent logs --name %s -f`, `sleeperagent status`, or `sleeperagent detach/stop --name %s`", p.instance, p.instance)
+	} else if p.interactiveAttach {
+		log.Printf("interactive attach: your terminal is inside the tmux session; detach the view with the tmux prefix + d (the watchdog keeps running). From another shell: `sleeperagent status`, `sleeperagent detach/stop --name %s`", p.instance)
 	} else {
 		log.Printf("%s", hotkeys.Legend)
 	}
@@ -345,7 +435,7 @@ func watchSession(p watchParams) error {
 
 	// Foreground hotkeys (no-op when stdin isn't a TTY). Raw mode needs CRLF, so
 	// route the logger through a translating writer while hotkeys are active.
-	if !p.transparentTTY && hotkeys.Listen(ctx, cmds, log.Printf) {
+	if !p.transparentTTY && !p.interactiveAttach && hotkeys.Listen(ctx, cmds, log.Printf) {
 		log.SetOutput(crlfWriter{os.Stderr})
 		defer log.SetOutput(os.Stderr)
 	}

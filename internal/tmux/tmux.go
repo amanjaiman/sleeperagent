@@ -7,9 +7,12 @@ package tmux
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/amanjaiman/sleeperagent/internal/adapter"
 )
@@ -127,6 +130,27 @@ func (c *Client) injectKeys(keys string) error {
 		}
 	}
 	return flush()
+}
+
+// Attach wires this process's terminal to the session via `tmux attach`, so
+// the user sees and drives the live agent while the supervisor keeps polling
+// in this process. It blocks until the user detaches (prefix-d), the session
+// ends, or ctx is cancelled (the client is then asked to detach via SIGTERM,
+// which tmux handles by restoring the terminal).
+func (c *Client) Attach(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, c.bin, "attach-session", "-t", c.Session)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	return cmd.Run()
+}
+
+// DetachClients detaches every client viewing the session, leaving the session
+// itself running.
+func (c *Client) DetachClients() error {
+	_, err := c.run("detach-client", "-s", c.Session)
+	return err
 }
 
 // Kill terminates the session (and the agent inside it).
