@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/amanjaiman/sleeperagent/internal/adapter"
@@ -15,8 +16,9 @@ import (
 )
 
 type watchTestPane struct {
-	screen string
-	ended  bool
+	screen   string
+	ended    bool
+	attached bool
 }
 
 func TestFlagWasSet(t *testing.T) {
@@ -40,7 +42,7 @@ func (p *watchTestPane) Capture(int) (string, error)   { return p.screen, nil }
 func (p *watchTestPane) Inject(string, string) error   { return nil }
 func (p *watchTestPane) AttachHint() string            { return "tmux attach -t test" }
 func (p *watchTestPane) Kill() error                   { return nil }
-func (p *watchTestPane) ClientAttached() (bool, error) { return false, nil }
+func (p *watchTestPane) ClientAttached() (bool, error) { return p.attached, nil }
 func (p *watchTestPane) Ended() (bool, error)          { return p.ended, nil }
 
 type captureNotifier struct {
@@ -89,6 +91,34 @@ func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
 	}
 	if !ended {
 		t.Fatalf("session-ended notification did not fire; events=%v", notifier.events)
+	}
+}
+
+// TestAttachSuppressingPaneHidesSelfView confirms the interactive-attach
+// wrapper discounts exactly one client (our own view) from the auto-detach
+// check while the self-view is active: the self-view alone is not a takeover,
+// a second client is, and once the self-view exits the underlying check
+// applies unchanged.
+func TestAttachSuppressingPaneHidesSelfView(t *testing.T) {
+	viewing := &atomic.Bool{}
+	clients := 1
+	p := attachSuppressingPane{
+		Pane:        &watchTestPane{attached: true},
+		viewing:     viewing,
+		clientCount: func() (int, error) { return clients, nil },
+	}
+
+	viewing.Store(true)
+	if attached, _ := p.ClientAttached(); attached {
+		t.Fatal("the self-view alone should not read as a takeover")
+	}
+	clients = 2
+	if attached, _ := p.ClientAttached(); !attached {
+		t.Fatal("a second client during the self-view is a takeover and should be reported")
+	}
+	viewing.Store(false)
+	if attached, _ := p.ClientAttached(); !attached {
+		t.Fatal("a client attached after the self-view exits should be reported")
 	}
 }
 
