@@ -103,7 +103,7 @@ On every platform, `run` from a real terminal drops you **straight into the live
 ## Ways to use it
 
 - **`sleeperagent run`** — the default. Launches the agent, watches it in your terminal, detaches with a hotkey, and takes over the moment you're back. Check on it from any other shell with `sleeperagent status`.
-- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux and want SleeperAgent to pick up watching it without restarting anything.
+- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux and want SleeperAgent to pick up watching it without restarting anything. From a real terminal this also drops you into the live session, same as `run`.
 
 ---
 
@@ -172,9 +172,9 @@ SleeperAgent is built to get out of your way. How handoff works depends on the b
 
 **tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over. Install tmux (`brew install tmux` on macOS) or pass `--backend tmux` if you specifically need this behavior.
 
-- **You start attached:** `run` from a terminal puts you inside the session immediately — prompt the agent as usual while the watchdog monitors. Detach the *view* with the tmux prefix + `d` (default `Ctrl-b d`); the watchdog keeps running and you get its console log back.
-- **`sleeperagent detach --name X`** from any other shell stops watching (the session keeps running).
-- **Auto-detach:** if you `tmux attach` *after* detaching your initial view, SleeperAgent treats it as a takeover and steps aside so you don't both type.
+- **You start attached:** `run` from a terminal puts you inside the session immediately — prompt the agent as usual while the watchdog monitors. Detach the *view* with the tmux prefix + `d` (default `Ctrl-b d`); the watchdog keeps running and you get its console log back **with the `d`/`q`/`k` hotkeys active**. (Runs from inside an existing tmux session skip the auto-attach, since tmux refuses nested attaches.)
+- **`sleeperagent detach --name X`** from any other shell stops watching (the session keeps running). If you're still inside the view, SleeperAgent tells you via the tmux status line and waits for you to detach rather than yanking your terminal.
+- **Auto-detach:** a `tmux attach` *after* you detach your initial view — or a **second** client attaching while your view is up — is treated as a takeover, and SleeperAgent steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
 - **`--detached` mode:** the pre-0.4 console view — supervisor logs in your terminal with hotkeys `d`/`q` detach, `k` kill (with a `y` confirm); Ctrl-C detaches, never kills.
 

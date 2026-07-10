@@ -7,21 +7,32 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
-- **tmux runs now start attached** — `sleeperagent run` from a real terminal
-  puts your terminal inside the tmux session immediately (via a supervised
-  `tmux attach`), so Linux/macOS now match the Windows/ConPTY experience:
-  prompt and use the agent exactly as if you'd launched it directly, while the
-  watchdog monitors from the same process and auto-resumes after a limit
-  reset. The supervisor's own attach client no longer triggers
-  auto-detach-on-attach; detaching your view (tmux prefix + `d`) keeps the
-  watchdog running and returns you to its console log, and a *subsequent*
-  manual `tmux attach` still auto-detaches the watchdog as before. Supervisor
-  logs are written to the instance log file while the view is attached
-  (`sleeperagent logs --name N`). Non-TTY runs (scripts, CI) are unchanged.
+- **tmux runs now start attached** — `sleeperagent run` (and `attach-existing`)
+  from a real terminal puts your terminal inside the tmux session immediately
+  (via a supervised `tmux attach`), so Linux/macOS now match the Windows/ConPTY
+  experience: prompt and use the agent exactly as if you'd launched it
+  directly, while the watchdog monitors from the same process and auto-resumes
+  after a limit reset. Details:
+  - The supervisor's own attach client doesn't trigger auto-detach, but a
+    *second* client attaching during your view — or a manual `tmux attach`
+    after you detach it — is still treated as a takeover and steps the
+    watchdog aside.
+  - Detaching your view (tmux prefix + `d`) keeps the watchdog running and
+    returns you to its console log with the `d`/`q`/`k` hotkeys active; the
+    hotkeys also engage if the initial attach fails (e.g. running from inside
+    an existing tmux session skips the auto-attach entirely).
+  - Stopping the watchdog while you're inside the view (`sleeperagent
+    detach`/`stop`) notifies you via the tmux status line and waits for you to
+    detach instead of yanking your terminal out of the session.
+  - Supervisor logs go to the instance log file while the view is attached
+    (`sleeperagent logs --name N`); after the view detaches, the run logs to
+    its terminal again.
+  - Non-TTY runs (scripts, CI) are unchanged.
 
 ### Added
-- **`--detached`** flag on `run` — opt out of the new attach-on-start behavior
-  and watch from the console with the `d`/`q`/`k` hotkeys, as before.
+- **`--detached`** flag on `run` and `attach-existing` — opt out of the new
+  attach-on-start behavior and watch from the console with the `d`/`q`/`k`
+  hotkeys, as before.
 
 ## [0.3.0] - 2026-07-04
 

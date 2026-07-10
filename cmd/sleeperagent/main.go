@@ -196,6 +196,8 @@ func runCmd(args []string) error {
 	var attachHint string
 	var restoreLogOutput func()
 	var interactiveAttach bool
+	var viewDone <-chan struct{}
+	var hotkeysFallback <-chan struct{}
 	selectedBackend := *backend
 	if selectedBackend == "tmux" && !backendExplicit {
 		if err := tmux.New(instance, "").Available(); err != nil {
@@ -226,49 +228,17 @@ func runCmd(args []string) error {
 		// Interactive attach (the default in a real terminal): put the user's
 		// terminal inside the session so they can prompt the agent directly,
 		// while the supervisor keeps polling in this process. Opt out with
-		// --detached; non-TTY contexts (scripts, CI) keep the detached behavior.
-		if !*detached && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+		// --detached; non-TTY contexts (scripts, CI) keep the detached behavior,
+		// and so does a run from inside tmux (nested attach is refused by tmux).
+		if interactiveWanted(*detached) {
+			ia, ierr := setupInteractiveAttach(tx, instance, afterDetach)
+			if ierr != nil {
+				return ierr
+			}
+			defer ia.restoreLogs()
+			pane, foreground, afterDetach = ia.pane, ia.foreground, ia.afterDetach
+			viewDone, hotkeysFallback = ia.viewDone, ia.hotkeysFallback
 			interactiveAttach = true
-			restore, rerr := redirectLogsToInstanceFile(instance)
-			if rerr != nil {
-				return rerr
-			}
-			var restoreOnce sync.Once
-			restoreLogs := func() { restoreOnce.Do(restore) }
-			defer restoreLogs()
-
-			// viewing is set before the supervisor starts so its first polls
-			// already ignore our own attach client (see attachSuppressingPane).
-			viewing := &atomic.Bool{}
-			viewing.Store(true)
-			stopping := &atomic.Bool{}
-			pane = attachSuppressingPane{Pane: tx, viewing: viewing}
-			foreground = func(ctx context.Context) {
-				err := tx.Attach(ctx)
-				viewing.Store(false)
-				restoreLogs()
-				if err != nil {
-					log.Printf("tmux attach ended: %v", err)
-				}
-				if ctx.Err() == nil && !stopping.Load() && tx.HasSession() {
-					log.Printf("view detached; still watching session %q. Reattach with: %s — stop watching with: sleeperagent detach --name %s",
-						instance, tx.AttachHint(), instance)
-				}
-			}
-			afterDetach = func(context.Context) {
-				stopping.Store(true)
-				// Close our own view so the terminal comes back to this process
-				// before it exits. If the self-view is already gone (e.g. the
-				// user detached it and later re-attached manually, triggering
-				// auto-detach), leave the clients alone — kicking the human off
-				// the session we just handed them would be rude.
-				if viewing.Load() {
-					_ = tx.DetachClients()
-					waitCondition(func() bool { return !viewing.Load() }, 2*time.Second)
-				}
-				restoreLogs()
-				log.Printf("detached. session %q left running — reattach with: %s", instance, tx.AttachHint())
-			}
 		}
 	case "pty":
 		restore, err := redirectLogsToInstanceFile(instance)
@@ -316,35 +286,116 @@ func runCmd(args []string) error {
 		notifier:          buildNotifier(*noNotify, *webhookURL),
 		transparentTTY:    selectedBackend == "pty",
 		interactiveAttach: interactiveAttach,
+		viewDone:          viewDone,
+		hotkeysFallback:   hotkeysFallback,
 	})
 }
 
-// attachSuppressingPane hides the supervisor's own attach client from the
-// auto-detach check: a self-attach means "the user is driving the agent while
-// the watchdog watches", not "the user took over — step aside". Once the
-// self-view exits (viewing is false), a newly attached client is a real
-// takeover and auto-detach applies as usual.
+// interactiveWanted reports whether to attach the user's terminal to the tmux
+// session: not opted out, a real terminal on both ends, and not already inside
+// tmux (tmux refuses a nested attach).
+func interactiveWanted(detached bool) bool {
+	if detached || os.Getenv("TMUX") != "" {
+		return false
+	}
+	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+// interactiveView is the wiring for an interactive-attach run: the user's
+// terminal lives inside the tmux session (a supervised `tmux attach` child)
+// while the supervisor watches from this process.
+type interactiveView struct {
+	pane        supervisor.Pane
+	foreground  func(context.Context)
+	afterDetach func(context.Context)
+	restoreLogs func() // idempotent; moves logging back to the console
+	// viewDone closes when the attach child has exited (view detached, session
+	// gone, or attach failed) — always after restoreLogs has run.
+	viewDone <-chan struct{}
+	// hotkeysFallback closes when the view exited but the watchdog is still
+	// running, so the caller should start console hotkeys.
+	hotkeysFallback <-chan struct{}
+}
+
+// setupInteractiveAttach redirects supervisor logs to the instance log file
+// (they must not scribble over the agent's TUI) and builds the closures that
+// run and tear down the self-view. baseAfterDetach is invoked for the final
+// user-facing detach message so there is a single source for its wording.
+func setupInteractiveAttach(tx *tmux.Client, instance string, baseAfterDetach func(context.Context)) (*interactiveView, error) {
+	restore, err := redirectLogsToInstanceFile(instance)
+	if err != nil {
+		return nil, err
+	}
+	var restoreOnce sync.Once
+	viewDone := make(chan struct{})
+	hotkeysFallback := make(chan struct{})
+	v := &interactiveView{
+		restoreLogs:     func() { restoreOnce.Do(restore) },
+		viewDone:        viewDone,
+		hotkeysFallback: hotkeysFallback,
+	}
+
+	// viewing is set before the supervisor starts so its first polls already
+	// treat our own attach client as the self-view (see attachSuppressingPane).
+	viewing := &atomic.Bool{}
+	viewing.Store(true)
+	stopping := &atomic.Bool{}
+	v.pane = attachSuppressingPane{Pane: tx, viewing: viewing, clientCount: tx.ClientCount}
+
+	v.foreground = func(ctx context.Context) {
+		err := tx.Attach(ctx)
+		viewing.Store(false)
+		v.restoreLogs()
+		if ctx.Err() == nil && !stopping.Load() && tx.HasSession() {
+			if err != nil {
+				log.Printf("could not attach the view (%v); watching from the console instead", err)
+			} else {
+				log.Printf("view detached; still watching session %q. Reattach with: %s", instance, tx.AttachHint())
+			}
+			close(hotkeysFallback)
+		}
+		close(viewDone)
+	}
+
+	v.afterDetach = func(ctx context.Context) {
+		stopping.Store(true)
+		// If the user is still in the self-view, don't yank them out of a live
+		// session mid-keystroke: tell them via the tmux status line and wait
+		// for them to detach on their own (mirrors the pty backend, where the
+		// agent keeps the terminal until it exits).
+		if viewing.Load() {
+			_ = tx.DisplayMessage("sleeperagent stopped watching — the session is all yours; detach (prefix + d) to close the watchdog process")
+			select {
+			case <-viewDone:
+			case <-ctx.Done():
+			}
+		}
+		v.restoreLogs()
+		baseAfterDetach(ctx)
+	}
+	return v, nil
+}
+
+// attachSuppressingPane keeps the supervisor's auto-detach check meaningful
+// while our own attach client exists: the self-view alone is "the user driving
+// the agent while the watchdog watches", not a takeover — but any client
+// beyond it is a real takeover. Once the self-view exits, the underlying
+// check applies as usual.
 type attachSuppressingPane struct {
 	supervisor.Pane
-	viewing *atomic.Bool
+	viewing     *atomic.Bool
+	clientCount func() (int, error)
 }
 
 func (p attachSuppressingPane) ClientAttached() (bool, error) {
 	if p.viewing.Load() {
-		return false, nil
+		n, err := p.clientCount()
+		if err != nil {
+			return false, err
+		}
+		return n > 1, nil
 	}
 	return p.Pane.ClientAttached()
-}
-
-// waitCondition polls cond until it holds or timeout elapses.
-func waitCondition(cond func() bool, timeout time.Duration) {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
 }
 
 func flagWasSet(fs *flag.FlagSet, name string) bool {
@@ -377,6 +428,23 @@ type watchParams struct {
 	notifier          notify.Notifier
 	transparentTTY    bool
 	interactiveAttach bool
+	// viewDone / hotkeysFallback are set for interactive-attach runs; see
+	// interactiveView. Both may be nil.
+	viewDone        <-chan struct{}
+	hotkeysFallback <-chan struct{}
+}
+
+// waitViewExit blocks (bounded) until the interactive self-view has torn down,
+// so final messages land on the user's console instead of racing the view's
+// log restore. No-op for non-interactive runs.
+func (p watchParams) waitViewExit() {
+	if p.viewDone == nil {
+		return
+	}
+	select {
+	case <-p.viewDone:
+	case <-time.After(5 * time.Second):
+	}
 }
 
 // watchSession runs the supervisor loop against an already-prepared backend.
@@ -440,6 +508,22 @@ func watchSession(p watchParams) error {
 		defer log.SetOutput(os.Stderr)
 	}
 
+	// Interactive attach owns stdin while the view is up, so hotkeys start only
+	// if the view goes away with the watchdog still running (user detached the
+	// view, or the attach failed) — restoring the classic console controls.
+	if p.hotkeysFallback != nil {
+		go func() {
+			select {
+			case <-ctx.Done():
+			case <-p.hotkeysFallback:
+				if hotkeys.Listen(ctx, cmds, log.Printf) {
+					log.SetOutput(crlfWriter{os.Stderr})
+					log.Printf("%s", hotkeys.Legend)
+				}
+			}
+		}()
+	}
+
 	// Control-file poller: `sleeperagent detach`/`stop` from another shell drops a
 	// command file that we pick up here and forward to the supervisor.
 	go pollControl(ctx, p.instance, cmds)
@@ -469,6 +553,7 @@ func watchSession(p watchParams) error {
 	}
 
 	if sup.SessionKilled() {
+		p.waitViewExit()
 		statefile.Remove(p.instance)
 		log.Printf("session %q killed.", p.instance)
 		return nil
@@ -476,6 +561,7 @@ func watchSession(p watchParams) error {
 	if sup.SessionEnded() {
 		// The agent exited or the session was killed out from under us; there is
 		// no live session to hand back, so skip the reattach hint.
+		p.waitViewExit()
 		statefile.Remove(p.instance)
 		log.Printf("session %q ended — the agent exited. Nothing left to watch.", p.instance)
 		return nil
@@ -555,6 +641,7 @@ func attachExistingCmd(args []string) error {
 	agent := fs.String("agent", "claude", "agent adapter to use")
 	name := fs.String("name", "", "instance name for status/state (default: target)")
 	target := fs.String("target", "", "tmux target to watch, e.g. mywork:0.1 (required)")
+	detached := fs.Bool("detached", false, "do not attach this terminal to the session; watch from the console instead")
 	promptText := fs.String("prompt", "", "static resume prompt")
 	cfgPath := fs.String("config", "", "path to config.toml")
 	reprompt := fs.String("reprompt", "", `local-LLM reprompt, e.g. "ollama:llama3.1"`)
@@ -603,16 +690,34 @@ func attachExistingCmd(args []string) error {
 	}
 
 	log.Printf("attaching to existing target %q", *target)
+
+	var pane supervisor.Pane = tx
+	var foreground func(context.Context)
+	var interactiveAttach bool
+	var viewDone, hotkeysFallback <-chan struct{}
+	afterDetach := func(context.Context) {
+		log.Printf("detached. target %q left running — reattach with: %s", *target, tx.AttachHint())
+	}
+	if interactiveWanted(*detached) {
+		ia, ierr := setupInteractiveAttach(tx, instance, afterDetach)
+		if ierr != nil {
+			return ierr
+		}
+		defer ia.restoreLogs()
+		pane, foreground, afterDetach = ia.pane, ia.foreground, ia.afterDetach
+		viewDone, hotkeysFallback = ia.viewDone, ia.hotkeysFallback
+		interactiveAttach = true
+	}
+
 	return watchSession(watchParams{
-		instance:     instance,
-		agent:        *agent,
-		adapter:      ad,
-		pane:         tx,
-		attachHint:   tx.AttachHint(),
-		startSession: nil, // already running
-		afterDetach: func(context.Context) {
-			log.Printf("detached. target %q left running — reattach with: %s", *target, tx.AttachHint())
-		},
+		instance:          instance,
+		agent:             *agent,
+		adapter:           ad,
+		pane:              pane,
+		attachHint:        tx.AttachHint(),
+		startSession:      nil, // already running
+		foreground:        foreground,
+		afterDetach:       afterDetach,
 		builder:           builder,
 		promptMode:        promptMode,
 		resumeText:        resumeText,
@@ -620,6 +725,9 @@ func attachExistingCmd(args []string) error {
 		cwd:               cwd,
 		autoAnswerPrompts: *autoAnswerPrompts,
 		notifier:          buildNotifier(*noNotify, *webhookURL),
+		interactiveAttach: interactiveAttach,
+		viewDone:          viewDone,
+		hotkeysFallback:   hotkeysFallback,
 	})
 }
 

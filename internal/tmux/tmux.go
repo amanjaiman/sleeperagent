@@ -153,6 +153,28 @@ func (c *Client) DetachClients() error {
 	return err
 }
 
+// ClientCount reports how many clients are attached to the session. It lets a
+// caller that owns one attach client of its own distinguish "just my view"
+// from "my view plus someone else".
+func (c *Client) ClientCount() (int, error) {
+	out, err := c.run("list-clients", "-t", c.Session)
+	if err != nil {
+		return 0, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return 0, nil
+	}
+	return len(strings.Split(out, "\n")), nil
+}
+
+// DisplayMessage flashes text in the attached clients' tmux status line — the
+// only channel to a user who is inside the session while our logs go elsewhere.
+func (c *Client) DisplayMessage(text string) error {
+	_, err := c.run("display-message", "-t", c.Session, text)
+	return err
+}
+
 // Kill terminates the session (and the agent inside it).
 func (c *Client) Kill() error {
 	_, err := c.run("kill-session", "-t", c.Session)

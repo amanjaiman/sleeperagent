@@ -4,7 +4,8 @@ cd "$(dirname "$0")/.."
 fail=0
 for s in integration integration_m2 integration_m2_autodetach \
          integration_attach integration_codex integration_reprompt integration_pty \
-         integration_dead_session integration_interactive_attach; do
+         integration_dead_session integration_interactive_attach \
+         integration_interactive_second_client; do
   sed -i 's/\r$//' "test/$s.sh" 2>/dev/null
   printf '%-30s ' "$s"
   if bash "test/$s.sh" >"/tmp/$s.out" 2>&1 && grep -q 'RESULT: PASS' "/tmp/$s.out"; then

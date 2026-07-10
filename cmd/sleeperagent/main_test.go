@@ -95,15 +95,26 @@ func TestWatchSessionRemovesRecordAfterCleanSessionEnd(t *testing.T) {
 }
 
 // TestAttachSuppressingPaneHidesSelfView confirms the interactive-attach
-// wrapper hides our own tmux client from the auto-detach check while the
-// self-view is active, and passes real attaches through once it exits.
+// wrapper discounts exactly one client (our own view) from the auto-detach
+// check while the self-view is active: the self-view alone is not a takeover,
+// a second client is, and once the self-view exits the underlying check
+// applies unchanged.
 func TestAttachSuppressingPaneHidesSelfView(t *testing.T) {
 	viewing := &atomic.Bool{}
-	p := attachSuppressingPane{Pane: &watchTestPane{attached: true}, viewing: viewing}
+	clients := 1
+	p := attachSuppressingPane{
+		Pane:        &watchTestPane{attached: true},
+		viewing:     viewing,
+		clientCount: func() (int, error) { return clients, nil },
+	}
 
 	viewing.Store(true)
 	if attached, _ := p.ClientAttached(); attached {
-		t.Fatal("self-view should be hidden from the auto-detach check")
+		t.Fatal("the self-view alone should not read as a takeover")
+	}
+	clients = 2
+	if attached, _ := p.ClientAttached(); !attached {
+		t.Fatal("a second client during the self-view is a takeover and should be reported")
 	}
 	viewing.Store(false)
 	if attached, _ := p.ClientAttached(); !attached {

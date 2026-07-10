@@ -54,6 +54,10 @@ check "still RUNNING after view detach" '"$BIN" status --name "$N" | grep -q RUN
 # After the view detaches, logging returns to the console (the script pty),
 # so the "still watching" hint lands in the script log, not the file log.
 check "console mentions still watching" 'grep -qia "still watching" /tmp/ak_ia_script.log'
+# Hotkeys fall back on once the view is gone, restoring the classic console
+# controls; the legend is printed when they engage.
+sleep 2
+check "hotkey legend printed after view detach" 'grep -qa "\[d\]etach" /tmp/ak_ia_script.log'
 
 echo "== a real re-attach after the self-view must auto-detach (old behavior) =="
 TERM=xterm script -qfc "tmux attach -t $N" /dev/null >/tmp/ak_ia_reattach.log 2>&1 &

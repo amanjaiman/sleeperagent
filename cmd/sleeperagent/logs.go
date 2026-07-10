@@ -14,14 +14,15 @@ import (
 	"github.com/amanjaiman/sleeperagent/internal/statefile"
 )
 
-// instanceLogPath is where a pty-backend instance's supervisor log is written.
+// instanceLogPath is where an instance's supervisor log is written: pty-backend
+// runs always, and tmux runs while the interactive view is attached — the two
+// modes where supervisor output is kept off the terminal so it doesn't corrupt
+// the agent's TUI.
 func instanceLogPath(instance string) string {
 	return filepath.Join(statefile.Dir(), instance+".log")
 }
 
-// logsCmd prints (and optionally follows) an instance's supervisor log. The log
-// exists for pty-backend runs, where supervisor output is kept off the terminal
-// so it doesn't corrupt the agent's TUI.
+// logsCmd prints (and optionally follows) an instance's supervisor log.
 func logsCmd(args []string) error {
 	fs := flag.NewFlagSet("logs", flag.ContinueOnError)
 	name := fs.String("name", "", "instance name (required)")
@@ -39,7 +40,8 @@ func logsCmd(args []string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("no log file for instance %q at %s\n"+
-				"(logs are written by the pty backend; a tmux foreground run logs to its own terminal)",
+				"(the log is written by pty-backend runs, and by tmux runs while the interactive "+
+				"view is attached; after the view detaches, the run logs to its own terminal)",
 				*name, path)
 		}
 		return err
