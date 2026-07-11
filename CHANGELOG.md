@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-11
+
 ### Fixed
 - The rate-limit menu is now auto-answered even when it draws after the
   supervisor has already moved to WAITING. Previously only RUNNING and LIMITED
