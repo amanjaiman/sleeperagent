@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- The rate-limit menu is now auto-answered even when it draws after the
+  supervisor has already moved to WAITING. Previously only RUNNING and LIMITED
+  scanned for auto-responses, so a menu that appeared a tick after the limit
+  banner sat unanswered for the whole wait and swallowed the resume prompt.
+- After a reset, a lingering bare-clock limit banner whose wording differs from
+  the line that latched (so it dodged the same-match dedupe) no longer counts
+  as a fresh re-hit. It used to re-parse as tomorrow's time, exceed `max_wait`,
+  and detach the watchdog right at the moment it should have resumed.
+
 ## [0.5.0] - 2026-07-10
 
 ### Added
