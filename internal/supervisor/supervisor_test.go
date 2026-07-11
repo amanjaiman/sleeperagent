@@ -454,6 +454,100 @@ func TestAutoResponseInjectsSafeStopAndWaitOnce(t *testing.T) {
 	}
 }
 
+// TestAutoResponseAnswersMenuThatAppearsWhileWaiting reproduces the daybreak-1
+// failure: the limit banner is detected and the supervisor moves to WAITING
+// before the rate-limit menu finishes drawing. The menu must still be
+// auto-answered mid-wait, not sit unhandled until the reset.
+func TestAutoResponseAnswersMenuThatAppearsWhileWaiting(t *testing.T) {
+	menu := readParserTestdata(t, "claude", "rate-limit-menu.txt")
+	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
+	banner := "Claude usage limit reached. Your limit will reset at 11am.\n"
+	pane := &fakePane{screen: banner}
+	ad, err := adapter.Compile("claude", adapter.Spec{
+		LimitPatterns: []string{`(?i)usage limit reached.*reset at (?P<time>[^\r\n.]+)`},
+		AutoResponses: []adapter.AutoResponseSpec{{
+			Pattern: `(?i)rate.?limit.?options|stop and wait for (?:(?:the|your) )?limit to reset`,
+			Keys:    "1\r",
+			Once:    true,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sup := New(Options{
+		Adapter: ad, Tmux: pane, Prompt: prompt.NewStatic("continue"),
+		PollInterval: time.Second, ResetBuffer: time.Second, MaxWait: 24 * time.Hour,
+		Now: clk.now,
+	})
+
+	must(t, sup.tick()) // RUNNING -> LIMITED (no menu drawn yet)
+	must(t, sup.tick()) // LIMITED -> WAITING
+	if sup.State() != state.Waiting {
+		t.Fatalf("state = %s, want WAITING", sup.State())
+	}
+	if len(pane.injected) != 0 {
+		t.Fatalf("nothing should be injected before the menu appears, got %q", pane.injected)
+	}
+
+	// The menu draws while the supervisor is already waiting.
+	pane.screen = banner + menu
+	must(t, sup.tick())
+	if len(pane.injected) != 1 || pane.injected[0] != "1\r" {
+		t.Fatalf("auto-response injected = %q, want one %q", pane.injected, "1\\r")
+	}
+	if sup.State() != state.Waiting {
+		t.Fatalf("state = %s, want WAITING (still)", sup.State())
+	}
+}
+
+// TestResumingIgnoresRolledForwardStaleBanner reproduces the second half of the
+// daybreak-1 failure: right after the reset, a lingering bare-clock banner that
+// renders differently from the triggering line re-parses as tomorrow's time. It
+// must not count as a re-hit (which pushed the wait past max_wait and detached).
+func TestResumingIgnoresRolledForwardStaleBanner(t *testing.T) {
+	clk := &driveClock{t: time.Date(2026, 6, 26, 10, 0, 0, 0, time.Local)}
+	pane := &fakePane{screen: "5-hour limit reached ∙ resets 11am\n"}
+	// After the resume prompt is injected, the pane still shows a limit line with
+	// the same clock time, but worded differently from the line that latched.
+	pane.onInject = func(string) string {
+		return "weekly limit reached ∙ resets 11am\nresumed, working again\n"
+	}
+
+	sup := New(Options{
+		Adapter:      testAdapter(t),
+		Tmux:         pane,
+		Prompt:       prompt.NewStatic("continue"),
+		PollInterval: time.Second,
+		ResetBuffer:  60 * time.Second,
+		MaxWait:      24 * time.Hour,
+		Now:          clk.now,
+	})
+
+	must(t, sup.tick()) // RUNNING -> LIMITED
+	must(t, sup.tick()) // LIMITED -> WAITING (until 11:01)
+	if sup.State() != state.Waiting {
+		t.Fatalf("state = %s, want WAITING", sup.State())
+	}
+
+	clk.add(62 * time.Minute) // past 11:01
+	must(t, sup.tick())       // WAITING -> RESUMING
+	clk.add(3 * time.Second)  // let the idle heuristic pass
+	must(t, sup.tick())       // inject resume prompt; stale banner renders
+	if len(pane.injected) != 1 || pane.injected[0] != "continue" {
+		t.Fatalf("injected = %v, want [continue]", pane.injected)
+	}
+
+	// The differently-worded banner resolves to 11am tomorrow — a pure 24h
+	// roll-forward of the reset we just waited out. Resume must confirm.
+	must(t, sup.tick())
+	if sup.State() != state.Running {
+		t.Fatalf("state = %s, want RUNNING (stale rolled-forward banner treated as re-hit?)", sup.State())
+	}
+	if sup.limitCycles != 0 {
+		t.Fatalf("limitCycles = %d, want 0", sup.limitCycles)
+	}
+}
+
 func TestSafeStopAndWaitGateMatchesCapturedMenu(t *testing.T) {
 	menu := readParserTestdata(t, "claude", "rate-limit-menu.txt")
 	if !safeStopAndWait.MatchString(menu) {

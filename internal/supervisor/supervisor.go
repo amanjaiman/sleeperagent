@@ -291,7 +291,7 @@ func (s *Supervisor) tick() error {
 	case state.Limited:
 		s.onLimited(capture, now)
 	case state.Waiting:
-		s.onWaiting(now)
+		s.onWaiting(capture, now)
 	case state.Resuming:
 		if err := s.onResuming(capture, now); err != nil {
 			return err
@@ -515,7 +515,13 @@ func firstPromptKeys(promptText string) string {
 	return "\r"
 }
 
-func (s *Supervisor) onWaiting(now time.Time) {
+func (s *Supervisor) onWaiting(capture string, now time.Time) {
+	// The agent's rate-limit menu can draw a tick or more after the banner that
+	// moved us to WAITING. Keep answering safe prompts here, or the menu sits
+	// unhandled for the whole wait and swallows the resume prompt at reset.
+	if !s.scanAutoResponses(capture) {
+		s.scanAutoAnswerPrompt(capture, now)
+	}
 	if !now.Before(s.waitUntil) {
 		s.opt.Logf("reset reached; resuming")
 		s.injected = false
@@ -564,20 +570,28 @@ func (s *Supervisor) onResuming(capture string, now time.Time) error {
 	// limit line counts — the line that triggered this event still lingers in
 	// scrollback and must not be mistaken for a fresh re-hit.
 	if match, groups, limited := parser.Detect(s.opt.Adapter.LimitPatterns, capture); limited && match != s.currentMatch {
-		s.limitCycles++
-		if s.limitCycles >= maxLimitCycles {
-			s.opt.Logf("limit re-triggered %d times after resume; detaching. Take over with: %s",
-				s.limitCycles, s.opt.Tmux.AttachHint())
-			s.st = state.Detached
+		// A bare-clock banner from the event we just waited out re-parses after
+		// the reset as tomorrow's time; that stale roll-forward is not a fresh
+		// re-hit and must not restart a (day-long) wait.
+		reset := parser.Resolve(groups, now, fallbackWindow)
+		if reset.Source == parser.SourceClock && parser.IsNextDayRollForward(reset.Time, s.reset.Time, resetRollForwardTolerance) {
+			s.opt.Logf("ignoring stale limit banner that rolled forward to the next day")
+		} else {
+			s.limitCycles++
+			if s.limitCycles >= maxLimitCycles {
+				s.opt.Logf("limit re-triggered %d times after resume; detaching. Take over with: %s",
+					s.limitCycles, s.opt.Tmux.AttachHint())
+				s.st = state.Detached
+				return nil
+			}
+			s.opt.Logf("resume re-hit the limit (cycle %d); re-waiting", s.limitCycles)
+			s.currentMatch = match
+			s.groups = groups
+			s.injected = false
+			s.injectAttempts = 0
+			s.st = state.Limited
 			return nil
 		}
-		s.opt.Logf("resume re-hit the limit (cycle %d); re-waiting", s.limitCycles)
-		s.currentMatch = match
-		s.groups = groups
-		s.injected = false
-		s.injectAttempts = 0
-		s.st = state.Limited
-		return nil
 	}
 
 	// If the prompt is still sitting in the input box, it was typed but not
