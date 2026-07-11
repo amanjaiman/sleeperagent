@@ -58,6 +58,12 @@ type RepromptConfig struct {
 	Denylist       []string `toml:"denylist"`
 }
 
+// UpdateConfig configures the startup update check. Check is a pointer so an
+// absent key keeps the default (enabled) while `check = false` disables it.
+type UpdateConfig struct {
+	Check *bool `toml:"check"`
+}
+
 // Config is the whole SleeperAgent configuration.
 type Config struct {
 	PollInterval Duration               `toml:"poll_interval"`
@@ -65,6 +71,13 @@ type Config struct {
 	MaxWait      Duration               `toml:"max_wait"`
 	Agents       map[string]AgentConfig `toml:"agents"`
 	Reprompt     RepromptConfig         `toml:"reprompt"`
+	Update       UpdateConfig           `toml:"update"`
+}
+
+// UpdateCheckEnabled reports whether the startup update check is on (the
+// default when the config doesn't say otherwise).
+func (c Config) UpdateCheckEnabled() bool {
+	return c.Update.Check == nil || *c.Update.Check
 }
 
 // Default returns the built-in configuration, including the Claude Code adapter.
@@ -200,6 +213,9 @@ func overlay(base *Config, user Config) {
 	}
 	if len(user.Reprompt.Denylist) != 0 {
 		base.Reprompt.Denylist = user.Reprompt.Denylist
+	}
+	if user.Update.Check != nil {
+		base.Update.Check = user.Update.Check
 	}
 }
 

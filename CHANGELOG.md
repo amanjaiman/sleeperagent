@@ -6,6 +6,27 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-10
+
+### Added
+- **Self-update** — new `sleeperagent update` command downloads the latest
+  GitHub release for your OS/arch, verifies it against the release's
+  `checksums.txt`, and atomically replaces the executable (on Windows the
+  running exe is parked as `.old` and swept up on the next start). `--check`
+  only reports. Release builds also offer this at startup, Codex-style:
+  `run`/`attach-existing` from a real terminal checks for a newer release at
+  most once a day and asks `Update now? [Y/n]` before the session launches.
+  The check is skipped for source (`dev`) builds and non-TTY runs, never
+  blocks startup on a slow or offline network (3s timeout, result cached),
+  and can be disabled with `check = false` under `[update]` in config.toml or
+  the `SLEEPERAGENT_NO_UPDATE_CHECK` env var. A failed or declined update
+  never touches the existing binary.
+
+### Fixed
+- CI now runs the integration suite through `test/run_all.sh`, so new
+  integration scripts can't silently drift out of CI (dead-session and the
+  interactive-attach tests were missing from the workflow's hand-kept list).
+
 ## [0.4.0] - 2026-07-10
 
 ### Changed
@@ -113,6 +134,7 @@ upgrading.
   times are cleared once the agent resumes, so `status` reports `RUNNING` with no
   leftover countdown.
 
-[Unreleased]: https://github.com/amanjaiman/sleeperagent/compare/v0.4.0...main
+[Unreleased]: https://github.com/amanjaiman/sleeperagent/compare/v0.5.0...main
+[0.5.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/amanjaiman/sleeperagent/compare/v0.2.0...v0.3.0

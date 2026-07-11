@@ -45,6 +45,13 @@ limit_patterns = [
 inject_style   = "text-enter"        # text, then Enter
 yolo_flag      = "--dangerously-bypass-approvals-and-sandbox"
 
+# Startup update check: on `run`/`attach-existing` from a real terminal,
+# SleeperAgent asks GitHub (at most once a day) whether a newer release exists
+# and offers to install it. Set check = false to disable, or set the
+# SLEEPERAGENT_NO_UPDATE_CHECK env var. `sleeperagent update` always works.
+[update]
+check = true
+
 # Local-LLM reprompt. Active only with `--reprompt ollama:<model>`; otherwise the
 # static prompt is used. On any failure (server down, empty/over-long/denylisted
 # output) SleeperAgent falls back to the static prompt.

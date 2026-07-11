@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -33,6 +34,7 @@ import (
 	"github.com/amanjaiman/sleeperagent/internal/statefile"
 	"github.com/amanjaiman/sleeperagent/internal/supervisor"
 	"github.com/amanjaiman/sleeperagent/internal/tmux"
+	"github.com/amanjaiman/sleeperagent/internal/update"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -40,6 +42,10 @@ var version = "dev"
 
 func main() {
 	log.SetFlags(log.Ltime)
+	// A Windows self-update leaves the previous exe parked as "<exe>.old"
+	// (a running exe can't be overwritten); sweep it up now that we're the
+	// new binary.
+	update.CleanupOld()
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
@@ -50,6 +56,8 @@ func main() {
 		err = runCmd(os.Args[2:])
 	case "attach-existing":
 		err = attachExistingCmd(os.Args[2:])
+	case "update":
+		err = updateCmd(os.Args[2:])
 	case "agents":
 		err = agentsCmd(os.Args[2:])
 	case "parse":
@@ -94,6 +102,7 @@ Usage:
   sleeperagent detach          --name NAME                     stop watching, keep session
   sleeperagent stop            --name NAME [--kill]             stop watching (optionally kill)
   sleeperagent rm              --name NAME [--force] | --all    remove a stale/ended instance record
+  sleeperagent update          [--check]                       update to the latest release (--check: only report)
   sleeperagent version                                         print version
 
 Run flags:
@@ -151,6 +160,7 @@ func runCmd(args []string) error {
 	if err != nil {
 		return err
 	}
+	maybeOfferUpdate(cfg)
 	ad, err := cfg.Adapter(*agent)
 	if err != nil {
 		return err
@@ -570,6 +580,89 @@ func watchSession(p watchParams) error {
 	return nil
 }
 
+// updateCmd checks the latest GitHub release and (unless --check) replaces the
+// current executable with it, after verifying the download against the
+// release's checksums.txt.
+func updateCmd(args []string) error {
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
+	checkOnly := fs.Bool("check", false, "only report whether an update is available")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cl := update.New()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	latest, err := cl.LatestVersion(ctx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("could not determine the latest release: %w", err)
+	}
+	if !update.Parseable(version) {
+		return fmt.Errorf("this build reports version %q (built from source?) — update with "+
+			"`go install github.com/amanjaiman/sleeperagent/cmd/sleeperagent@%s` or download a release binary",
+			version, latest)
+	}
+	update.RecordCheck(latest)
+	if !update.Newer(version, latest) {
+		fmt.Printf("sleeperagent %s is up to date (latest release: %s)\n", version, latest)
+		return nil
+	}
+	if *checkOnly {
+		fmt.Printf("update available: %s (you have %s). Run `sleeperagent update` to install it.\n", latest, version)
+		return nil
+	}
+	fmt.Printf("updating %s → %s ...\n", version, latest)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := cl.Apply(ctx, latest); err != nil {
+		return err
+	}
+	fmt.Printf("updated to %s. Running instances keep their current version until restarted.\n", latest)
+	return nil
+}
+
+// maybeOfferUpdate is the Codex-style startup check: at most once a day, only
+// in a real terminal, opt-out via config or env, and never blocking startup on
+// a slow or offline network. Runs before the session launches so the prompt
+// doesn't fight the agent for the terminal.
+func maybeOfferUpdate(cfg config.Config) {
+	if !update.Parseable(version) || !cfg.UpdateCheckEnabled() || os.Getenv("SLEEPERAGENT_NO_UPDATE_CHECK") != "" {
+		return
+	}
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		return
+	}
+	if !update.ShouldCheck(24 * time.Hour) {
+		return
+	}
+	cl := update.New()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	latest, err := cl.LatestVersion(ctx)
+	cancel()
+	// Record the attempt even on failure so an offline machine isn't re-stalled
+	// (up to the timeout) on every startup.
+	update.RecordCheck(latest)
+	if err != nil || !update.Newer(version, latest) {
+		return
+	}
+	fmt.Printf("sleeperagent %s is available (you have %s). Update now? [Y/n] ", latest, version)
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "", "y", "yes":
+	default:
+		return
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := cl.Apply(ctx, latest); err != nil {
+		log.Printf("update failed (continuing with %s): %v", version, err)
+		return
+	}
+	log.Printf("updated to %s — takes effect on the next start; this run continues on %s", latest, version)
+}
+
 // buildBuilder constructs the resume-prompt builder (static or local-LLM).
 func buildBuilder(cfg config.Config, ad *adapter.Adapter, repromptSpec, resumeText string) (prompt.Builder, string, error) {
 	if repromptSpec == "" {
@@ -659,6 +752,7 @@ func attachExistingCmd(args []string) error {
 	if err != nil {
 		return err
 	}
+	maybeOfferUpdate(cfg)
 	ad, err := cfg.Adapter(*agent)
 	if err != nil {
 		return err

@@ -8,6 +8,9 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/sleeperagent-linux"
 export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
+# This test gives the binary a real TTY, which would arm the startup update
+# prompt on a version-stamped build; keep the test hermetic.
+export SLEEPERAGENT_NO_UPDATE_CHECK=1
 N="ak-i2c-$$"
 fail=0
 

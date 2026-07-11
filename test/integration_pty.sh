@@ -12,6 +12,9 @@ HOOKLOG="$(mktemp)"
 CFG="$(mktemp --suffix=.toml)"
 AGENT="$(mktemp --suffix=.sh)"
 export SLEEPERAGENT_STATE_DIR="$(mktemp -d)"
+# The supervisor runs under a pty here, which would arm the startup update
+# prompt on a version-stamped build; keep the test hermetic.
+export SLEEPERAGENT_NO_UPDATE_CHECK=1
 
 cleanup() {
   [ -n "${HOOK_PID:-}" ] && kill "$HOOK_PID" 2>/dev/null

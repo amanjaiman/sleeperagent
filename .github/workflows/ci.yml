@@ -50,17 +50,10 @@ jobs:
       - name: install tmux
         run: sudo apt-get update && sudo apt-get install -y tmux
       - name: build linux binary
-        run: go build -o sleeperagent-linux ./cmd/sleeperagent
+        # The version stamp matters: integration_update.sh exercises the
+        # self-update flow, which a "dev" build refuses by design.
+        run: go build -ldflags "-X main.version=0.0.0-test" -o sleeperagent-linux ./cmd/sleeperagent
       - name: run integration scripts
-        run: |
-          set -e
-          for s in test/integration.sh \
-                   test/integration_m2.sh \
-                   test/integration_m2_autodetach.sh \
-                   test/integration_attach.sh \
-                   test/integration_codex.sh \
-                   test/integration_reprompt.sh \
-                   test/integration_pty.sh; do
-            echo "=== $s ==="
-            bash "$s"
-          done
+        # run_all.sh is the single source of truth for the suite, so new
+        # scripts can't silently drift out of CI.
+        run: bash test/run_all.sh

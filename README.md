@@ -59,6 +59,14 @@ Put it on your `PATH`:
 If the install directory is not already on `PATH`, the command prints the exact `setx PATH` or `export PATH` line to run, plus a reminder to open a new shell.
 On macOS/Linux, `install` also tries to add that PATH update to your shell profile automatically (zsh, bash, and sh; other shells get the printed line only). Pass `--no-profile` to skip that and just print the line yourself.
 
+**Staying up to date** — release builds check GitHub for a newer version when you start a run from a real terminal (at most once a day) and offer to install it; answer `Y` and the binary replaces itself, taking effect on the next start. You can also update explicitly any time:
+
+```bash
+sleeperagent update          # or --check to only report
+```
+
+Disable the startup check with `check = false` under `[update]` in config.toml, or `SLEEPERAGENT_NO_UPDATE_CHECK=1`.
+
 **With the Go toolchain:**
 
 ```bash
@@ -121,6 +129,7 @@ On every platform, `run` from a real terminal drops you **straight into the live
 | `agents [--config P]` | List configured adapters and validate that their patterns compile. |
 | `parse --agent A "text…"` | Test a captured limit string against an agent's patterns and show the resolved reset. |
 | `install [--dir DIR] [--force] [--no-profile]` | Copy this binary to a PATH directory. |
+| `update [--check]` | Update to the latest GitHub release (checksum-verified); `--check` only reports. |
 | `version` | Print the build version. |
 
 ### `run` flags
