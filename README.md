@@ -1,4 +1,4 @@
-<h1 align="center">SleeperAgent</h1>
+<h1 align="center">sleeperagent</h1>
 
 <p align="center">
   <a href="https://github.com/amanjaiman/sleeperagent/actions/workflows/ci.yml"
@@ -25,7 +25,7 @@
 
 <h3 align="center">Your usage limit resets. Your agent automatically continues.</h3>
 
-When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. SleeperAgent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
+When a coding agent hits a 5-hour or weekly usage limit it hard-stops until you manually type "continue." If that reset lands while you're asleep, the task sits dead for hours. sleeperagent runs the agent in a session it can watch, detects the limit, waits for the reset, and re-prompts it automatically — then hands the live session back the moment you show up.
 
 ```text
 12:58:03 watching. take over any time with: tmux attach -t feature-x
@@ -83,7 +83,7 @@ make check      # gofmt + go vet + unit tests
 
 ### Platform support
 
-SleeperAgent needs a "session backend" — something it can run the agent inside, read output from, and type into.
+sleeperagent needs a "session backend" — something it can run the agent inside, read output from, and type into.
 
 | OS | Default backend | Setup | Handoff |
 |---|---|---|---|
@@ -104,14 +104,14 @@ sleeperagent run --agent claude --name mytask
 
 `--agent` picks the adapter (how to detect the limit and drive the agent); by default it also launches that adapter's own command, so the `claude` adapter just runs `claude`. You only need a trailing `-- <command…>` to launch something *different* — your own flags, a wrapper, or another binary (see [Examples](#examples)). Run `sleeperagent` with no arguments for the built-in help.
 
-On every platform, `run` from a real terminal drops you **straight into the live agent**: prompt it and use it exactly as if you'd launched it directly, while SleeperAgent watches in the background and auto-resumes after a limit reset. On the tmux backend, detach your view with the tmux prefix + `d` (watchdog keeps running), or pass `--detached` to skip attaching entirely.
+On every platform, `run` from a real terminal drops you **straight into the live agent**: prompt it and use it exactly as if you'd launched it directly, while sleeperagent watches in the background and auto-resumes after a limit reset. On the tmux backend, detach your view with the tmux prefix + `d` (watchdog keeps running), or pass `--detached` to skip attaching entirely.
 
 ---
 
 ## Ways to use it
 
 - **`sleeperagent run`** — the default. Launches the agent, watches it in your terminal, detaches with a hotkey, and takes over the moment you're back. Check on it from any other shell with `sleeperagent status`.
-- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux and want SleeperAgent to pick up watching it without restarting anything. From a real terminal this also drops you into the live session, same as `run`.
+- **`sleeperagent attach-existing`** — you already started the agent yourself in tmux and want sleeperagent to pick up watching it without restarting anything. From a real terminal this also drops you into the live session, same as `run`.
 
 ---
 
@@ -177,13 +177,13 @@ sleeperagent parse --agent claude "5-hour limit reached ∙ resets 2pm"
 
 ## Taking over
 
-SleeperAgent is built to get out of your way. How handoff works depends on the backend:
+sleeperagent is built to get out of your way. How handoff works depends on the backend:
 
 **tmux backend (Linux/macOS):** the agent lives in a tmux session that **outlives the supervisor**, so nothing is lost when you take over. Install tmux (`brew install tmux` on macOS) or pass `--backend tmux` if you specifically need this behavior.
 
 - **You start attached:** `run` from a terminal puts you inside the session immediately — prompt the agent as usual while the watchdog monitors. Detach the *view* with the tmux prefix + `d` (default `Ctrl-b d`); the watchdog keeps running and you get its console log back **with the `d`/`q`/`k` hotkeys active**. (Runs from inside an existing tmux session skip the auto-attach, since tmux refuses nested attaches.)
-- **`sleeperagent detach --name X`** from any other shell stops watching (the session keeps running). If you're still inside the view, SleeperAgent tells you via the tmux status line and waits for you to detach rather than yanking your terminal.
-- **Auto-detach:** a `tmux attach` *after* you detach your initial view — or a **second** client attaching while your view is up — is treated as a takeover, and SleeperAgent steps aside so you don't both type.
+- **`sleeperagent detach --name X`** from any other shell stops watching (the session keeps running). If you're still inside the view, sleeperagent tells you via the tmux status line and waits for you to detach rather than yanking your terminal.
+- **Auto-detach:** a `tmux attach` *after* you detach your initial view — or a **second** client attaching while your view is up — is treated as a takeover, and sleeperagent steps aside so you don't both type.
 - Reattach anytime with `tmux attach -t <name>`.
 - **`--detached` mode:** the pre-0.4 console view — supervisor logs in your terminal with hotkeys `d`/`q` detach, `k` kill (with a `y` confirm); Ctrl-C detaches, never kills.
 
@@ -209,13 +209,13 @@ Built-in defaults already cover Claude Code and Codex. To override timings or th
 - `(?P<time>…)` — a clock time (`2pm`, `6:34 AM`)
 - `(?P<dur>…)` — a relative duration (`in 2h30m`, `in 45 minutes`)
 
-If none parse, SleeperAgent assumes a 5-hour window and flags it low-confidence. Use `sleeperagent parse` to check a pattern against real output, and `sleeperagent agents` to validate your config. Adding a new agent is usually just a new `[agents.<name>]` block — no code.
+If none parse, sleeperagent assumes a 5-hour window and flags it low-confidence. Use `sleeperagent parse` to check a pattern against real output, and `sleeperagent agents` to validate your config. Adding a new agent is usually just a new `[agents.<name>]` block — no code.
 
 ---
 
 ## Local-LLM reprompt *(optional)*
 
-By default SleeperAgent injects a fixed string on reset. With `--reprompt ollama:<model>` it instead asks a **local** model to write the next instruction: it reads the tail of the agent's transcript plus `git diff --stat` / `git log` in the agent's cwd, sends a fixed meta-prompt to Ollama, and **validates** the reply (non-empty, under `max_prompt_chars`, clears the denylist) before injecting.
+By default sleeperagent injects a fixed string on reset. With `--reprompt ollama:<model>` it instead asks a **local** model to write the next instruction: it reads the tail of the agent's transcript plus `git diff --stat` / `git log` in the agent's cwd, sends a fixed meta-prompt to Ollama, and **validates** the reply (non-empty, under `max_prompt_chars`, clears the denylist) before injecting.
 
 It's purely additive and safe-by-construction: if Ollama is unreachable, the output is empty/over-long/denylisted, or there's no context, it **falls back to the static prompt** so the session still resumes. Everything stays local — no transcript leaves your machine. Tune it under `[reprompt]` in the config (`model`, `base_url`, `max_prompt_chars`, `tail_messages`, `denylist`); `base_url` also honors `$OLLAMA_HOST`.
 
@@ -227,9 +227,9 @@ Desktop notifications are on by default (best effort; `--no-notify` to disable) 
 
 ## Safety
 
-SleeperAgent **waits for legitimate resets**; it does not bypass limits.
+sleeperagent **waits for legitimate resets**; it does not bypass limits.
 
-Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — SleeperAgent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit opt-in via `--yolo`, which bypasses permission prompts entirely; use it only when you understand the risk. Separately, **`--auto-answer-prompts` defaults to on**: it doesn't remove any prompts, but if one comes up while you're away, it answers with the first/default option — including ones that approve tool calls — rather than letting the run stall. Choosing to run an agent unattended already means accepting it can act without you each cycle; pass `--auto-answer-prompts=false` if you'd rather it stall on unexpected prompts instead. LLM-generated prompts are length-capped and denylist-checked before injection.
+Resuming unattended runs tool calls with no human in the loop, so by default the agent keeps its **normal permission prompts** — sleeperagent does *not* pass `--dangerously-skip-permissions` / full-auto for you. That's an explicit opt-in via `--yolo`, which bypasses permission prompts entirely; use it only when you understand the risk. Separately, **`--auto-answer-prompts` defaults to on**: it doesn't remove any prompts, but if one comes up while you're away, it answers with the first/default option — including ones that approve tool calls — rather than letting the run stall. Choosing to run an agent unattended already means accepting it can act without you each cycle; pass `--auto-answer-prompts=false` if you'd rather it stall on unexpected prompts instead. LLM-generated prompts are length-capped and denylist-checked before injection.
 
 ## How it works
 
